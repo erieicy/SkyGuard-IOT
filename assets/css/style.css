@@ -463,3 +463,167 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-cyan);
 }
+
+/* ============================================================================
+   Mobile UI & Live Camera Viewfinder Additions
+   ============================================================================ */
+
+/* Mobile Bottom Navigation Bar */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 990;
+  background: rgba(11, 15, 25, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-glass);
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+
+.mobile-nav-item i {
+  font-size: 1.15rem;
+}
+
+.mobile-nav-item.active {
+  color: var(--accent-cyan);
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.92);
+}
+
+/* Mobile Shutter Center Button in Bottom Nav */
+.mobile-snap-btn-center {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  color: #fff !important;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -20px;
+  box-shadow: 0 4px 15px rgba(6, 182, 212, 0.5);
+  border: 3px solid #0b0f19;
+}
+
+.mobile-snap-btn-center i {
+  font-size: 1.3rem !important;
+}
+
+/* Live Camera Modal & Viewfinder */
+.viewfinder-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  max-height: 60vh;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewfinder-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewfinder-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+}
+
+.viewfinder-corner-tl, .viewfinder-corner-tr,
+.viewfinder-corner-bl, .viewfinder-corner-br {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #38bdf8;
+  pointer-events: none;
+}
+
+.viewfinder-corner-tl { top: 16px; left: 16px; border-top: 3px solid; border-left: 3px solid; border-radius: 6px 0 0 0; }
+.viewfinder-corner-tr { top: 16px; right: 16px; border-top: 3px solid; border-right: 3px solid; border-radius: 0 6px 0 0; }
+.viewfinder-corner-bl { bottom: 16px; left: 16px; border-bottom: 3px solid; border-left: 3px solid; border-radius: 0 0 0 6px; }
+.viewfinder-corner-br { bottom: 16px; right: 16px; border-bottom: 3px solid; border-right: 3px solid; border-radius: 0 0 6px 0; }
+
+/* Camera Shutter Trigger Button */
+.shutter-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.5);
+}
+
+.shutter-btn:active {
+  transform: scale(0.88);
+  background: #e2e8f0;
+}
+
+.shutter-btn-inner {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.3rem;
+}
+
+/* Mobile Responsiveness Utility Adjustments */
+@media (max-width: 640px) {
+  body {
+    padding-bottom: 75px; /* Space for bottom navigation */
+  }
+
+  .roof-visualizer-box {
+    height: 250px;
+  }
+
+  .clothesline-structure {
+    height: 200px;
+  }
+
+  .timer-digits {
+    font-size: 2.1rem;
+  }
+}
+
