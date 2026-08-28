@@ -1,0 +1,101 @@
+================================================================================
+  SKYGUARD AI - PANDUAN SKEMATIK & PINOUT HARDWARE (JEMURAN PINTAR IoT)
+================================================================================
+  Sistem ini terdiri dari dua modul mikroprosesor:
+  1. Modul Utama: ESP32-S / ESP32 DevKit V1 (Kontrol Sensor & Motor Atap)
+  2. Modul Kamera: ESP32-CAM AI-Thinker OV2640 (AI Vision Langit & Sumber Cahaya)
+================================================================================
+
+[1] DAFTAR KOMPONEN (BILL OF MATERIALS):
+--------------------------------------------------------------------------------
+1. 1x ESP32 NodeMCU DevKit V1 (30 Pin / 38 Pin)
+2. 1x ESP32-CAM AI-Thinker + Modul Kamera OV2640
+3. 1x Sensor Air Hujan (Raindrop Sensor Module + Driver LM393)
+4. 1x Sensor Cahaya LDR (Light Dependent Resistor) + Resistor 10k Ohm (atau Modul LDR)
+5. 1x Motor Servo Metal Gear MG996R (atau SG90 untuk miniatur/prototype jemuran)
+6. 1x Modul Relay 5V (Opsional, jika memakai Motor DC Linear Actuator)
+7. 1x Buzzer Aktif 5V (Peringatan audio saat hujan/mendung)
+8. 1x Power Supply / Adaptor 5V 2A-3A (Disarankan power eksternal untuk Servo)
+9. Kabel Jumper (Male-to-Female, Male-to-Male)
+10. Rangka Miniatur Jemuran Baju dengan Atap Geser/Canopy Lipat
+
+--------------------------------------------------------------------------------
+[2] TABEL PINOUT & KONEKSI KABEL ESP32 UTAMA:
+--------------------------------------------------------------------------------
++-------------------+---------------------+--------------------+-----------------------------+
+| NAMA KOMPONEN     | PIN KOMPONEN        | PIN PADA ESP32     | KETERANGAN                  |
++-------------------+---------------------+--------------------+-----------------------------+
+| Sensor Air Hujan  | VCC                 | 3.3V / 5V          | Daya Sensor                 |
+|                   | GND                 | GND                | Ground Bersama              |
+|                   | DO (Digital Out)    | GPIO 34            | Deteksi Tetes Air Instan    |
+|                   | AO (Analog Out)     | GPIO 35            | Nilai Kelembaban / Basah    |
++-------------------+---------------------+--------------------+-----------------------------+
+| Sensor Cahaya LDR | VCC                 | 3.3V               | Daya LDR                    |
+|                   | GND                 | GND                | Ground Bersama              |
+|                   | AO (Analog Out)     | GPIO 32            | Intensitas Cahaya (0-4095)  |
++-------------------+---------------------+--------------------+-----------------------------+
+| Motor Servo       | VCC (Kabel Merah)   | 5V Eksternal       | *Gunakan Power Terpisah     |
+| (MG996R / SG90)   | GND (Kabel Coklat)  | GND Eksternal+ESP  | *GND harus digabung         |
+|                   | PWM (Kabel Kuning)  | GPIO 18            | Sinyal Sudut Buka/Tutup     |
++-------------------+---------------------+--------------------+-----------------------------+
+| Buzzer Audio      | Positif (+)         | GPIO 23            | Peringatan Hujan / Alarm    |
+|                   | Negatif (-)         | GND                | Ground Bersama              |
++-------------------+---------------------+--------------------+-----------------------------+
+| LED Indikator     | On-board LED        | GPIO 2             | Status Wi-Fi Aktif          |
++-------------------+---------------------+--------------------+-----------------------------+
+
+*CATATAN PENTING SERVO*:
+Servo MG996R menarik arus hingga 1.5A saat bergerak. JANGAN mengambil daya 5V dari pin ESP32 
+secara langsung karena dapat menyebabkan ESP32 restart (brownout). Gunakan catu daya 5V terpisah 
+untuk servo, lalu hubungkan GND power supply ke GND ESP32 (Common Ground).
+
+--------------------------------------------------------------------------------
+[3] TABEL PINOUT ESP32-CAM (AI-THINKER):
+--------------------------------------------------------------------------------
++-------------------+---------------------+--------------------+-----------------------------+
+| NAMA MODUL        | PIN MODUL           | KONEKSI            | KETERANGAN                  |
++-------------------+---------------------+--------------------+-----------------------------+
+| ESP32-CAM         | 5V                  | Adaptor 5V (2A)    | Power Kamera                |
+|                   | GND                 | GND Adaptor        | Ground                      |
+|                   | GPIO 4              | Internal           | Flash LED Super Terang      |
+|                   | GPIO 0              | GND (Saat Flash)   | Hubungkan GND saat upload   |
+|                   | U0R (RX)            | TX FTDI/USB-TTL    | Untuk upload kode Arduino   |
+|                   | U0T (TX)            | RX FTDI/USB-TTL    | Untuk upload kode Arduino   |
++-------------------+---------------------+--------------------+-----------------------------+
+
+--------------------------------------------------------------------------------
+[4] CARA KERJA SISTEM LOGIKA SKYGUARD AI:
+--------------------------------------------------------------------------------
+1. LOGIKA AIR & HUJAN:
+   - Modul sensor air mendeteksi tetesan hujan pada pelat sensor.
+   - Jika air menyentuh sensor (Active LOW), ESP32 secara instan (< 100ms) memutar servo
+     ke sudut 0 derajat (Atap TERTUTUP RAPAT) dan membunyikan alarm buzzer.
+   - Status terkirim ke REST API Dashboard `api/esp32.php`.
+
+2. LOGIKA CAHAYA & AI VISION:
+   - Sensor LDR membaca apakah terdapat cahaya terang di sekitar jemuran.
+   - Jika ada cahaya, ESP32-CAM mengambil foto sudut atas (menghadap langit).
+   - Server AI SkyGuard menganalisis citra:
+     * APAKAH CAHAYA MATAHARI? -> AI mengonfirmasi spektrum matahari alami -> Atap DIBUKA.
+     * APAKAH HANYA LAMPU BIASA? -> AI mendeteksi spektrum lampu bohlam/LED ruangan -> Atap TETAP TERTUTUP.
+     * APAKAH CUACA MENDUNG? -> AI mendeteksi awan gelap kumulonimbus -> Atap DITUTUP & Dashboard memberi peringatan bahaya hujan.
+
+3. LOGIKA STOPWATCH & TIMER PINTAR:
+   - Pengguna dapat mengatur waktu jemur via Dashboard (misal: 30 menit atau rekomendasi AI).
+   - Dashboard menghitung mundur waktu secara real-time.
+   - Ketika timer habis (00:00), atap otomatis ditutup agar pakaian tidak terpapar debu malam/kelembaban.
+
+4. MODE KONTROL:
+   - Mode OTOMATIS: Sistem bekerja mandiri berdasarkan AI cuaca, matahari, dan sensor air.
+   - Mode MANUAL: Pengguna bebas membuka/menutup atap kapan saja lewat tombol dashboard.
+   - Mode TIMER: Atap terbuka selama durasi yang ditentukan lalu tertutup otomatis.
+
+--------------------------------------------------------------------------------
+[5] LANGKAH PENGUJIAN AWAL:
+--------------------------------------------------------------------------------
+1. Buka folder dashboard di browser: http://localhost/SkyGuard-AI/
+2. Gunakan panel simulator bawaan di Dashboard untuk menguji respon sistem tanpa alat.
+3. Upload kode `esp32_firmware.txt` ke ESP32 melalui Arduino IDE.
+4. Upload kode `esp32_cam_firmware.txt` ke ESP32-CAM.
+5. Pastikan ESP32 dan Laptop/Server XAMPP berada dalam satu jaringan Wi-Fi yang sama.
+================================================================================
