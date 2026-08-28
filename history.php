@@ -251,5 +251,24 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
 
     </main>
 
+    <!-- Mobile Bottom Sticky Navigation Bar -->
+    <div class="sm:hidden mobile-bottom-nav">
+        <a href="index.php" class="mobile-nav-item">
+            <i class="fas fa-gauge-high"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="index.php" class="mobile-snap-btn-center" title="Foto Langsung">
+            <i class="fas fa-camera"></i>
+        </a>
+        <a href="history.php" class="mobile-nav-item active">
+            <i class="fas fa-images"></i>
+            <span>Riwayat</span>
+        </a>
+        <a href="firmware.php" class="mobile-nav-item">
+            <i class="fas fa-microchip"></i>
+            <span>ESP32</span>
+        </a>
+    </div>
+
 </body>
 </html>
