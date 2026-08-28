@@ -1,0 +1,277 @@
+/*
+ ============================================================================
+  SkyGuard AI - ESP32 Main Controller Firmware
+  Project: Smart Automated Clothesline (Jemuran Baju Pintar IoT)
+  File: esp32_firmware.txt
+  Target Board: ESP32-S / ESP32 DevKit V1
+  Author: SkyGuard AI Team
+ ============================================================================
+  DESKRIPSI:
+  Kode ini mengontrol:
+  1. Sensor Air / Hujan (Raindrop Sensor) pada GPIO/ADC.
+  2. Sensor Cahaya LDR (Light Dependent Resistor) pada ADC.
+  3. Motor Penggerak Atap Jemuran (Servo Motor MG996R / SG90 atau Relay Motor DC).
+  4. Buzzer Peringatan Saat Hujan / Cuaca Mendung.
+  5. Komunikasi Wi-Fi & REST API ke Dashboard Server SkyGuard AI.
+ ============================================================================
+*/
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <ESP32Servo.h>
+
+// ==========================================
+// 1. PENGATURAN WI-FI & SERVER
+// ==========================================
+const char* WIFI_SSID     = "NAMA_WIFI_ANDA";        // Ganti dengan SSID Wi-Fi Anda
+const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";    // Ganti dengan Password Wi-Fi Anda
+
+// Masukkan URL Server SkyGuard AI (Ganti IP Laptop/Server XAMPP Anda)
+// Contoh: "http://192.168.1.100/SkyGuard-AI/api/esp32.php"
+const String SERVER_URL   = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
+
+// ==========================================
+// 2. PINOUT HARDWARE ESP32
+// ==========================================
+#define PIN_RAIN_DIGITAL   34   // Sensor Hujan Digital Output (DO)
+#define PIN_RAIN_ANALOG    35   // Sensor Hujan Analog Output (AO)
+#define PIN_LDR_ANALOG     32   // Sensor Cahaya LDR Analog
+#define PIN_SERVO_ROOF     18   // Pin PWM Kontrol Servo Motor Atap Jemuran
+#define PIN_BUZZER         23   // Pin Buzzer Audio Peringatan Hujan
+#define PIN_LED_STATUS      2   // LED Indikator On-board ESP32
+
+// ==========================================
+// 3. VARIABEL & OBJEK KONTROL
+// ==========================================
+Servo roofServo;
+
+// Posisi Derajat Servo:
+// 180 Derajat = Jemuran Terbuka Penuh
+// 0 Derajat   = Jemuran Tertutup Rapat
+const int SERVO_OPEN_ANGLE   = 180;
+const int SERVO_CLOSED_ANGLE = 0;
+
+int currentServoAngle = SERVO_CLOSED_ANGLE;
+String currentRoofStatus = "CLOSED";
+String controlMode = "AUTO";
+
+unsigned long lastSensorUpdate = 0;
+const unsigned long SENSOR_INTERVAL = 3000; // Kirim data sensor setiap 3 detik
+
+unsigned long lastCommandPoll = 0;
+const unsigned long COMMAND_INTERVAL = 2000; // Cek perintah server setiap 2 detik
+
+// ==========================================
+// 4. SETUP SISTEM
+// ==========================================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n========================================");
+  Serial.println("  SKYGUARD AI - ESP32 CONTROLLER BOOTING ");
+  Serial.println("========================================");
+
+  // Inisialisasi Pin
+  pinMode(PIN_RAIN_DIGITAL, INPUT);
+  pinMode(PIN_RAIN_ANALOG, INPUT);
+  pinMode(PIN_LDR_ANALOG, INPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(PIN_LED_STATUS, OUTPUT);
+
+  digitalWrite(PIN_BUZZER, LOW);
+  digitalWrite(PIN_LED_STATUS, LOW);
+
+  // Inisialisasi Servo
+  ESP32PWM::allocateTimer(0);
+  roofServo.setPeriodHertz(50); // Standar 50Hz servo
+  roofServo.attach(PIN_SERVO_ROOF, 500, 2400); // Pulse width standard servo
+
+  // Set awal atap tertutup untuk keamanan
+  setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", false);
+
+  // Hubungkan ke Wi-Fi
+  connectToWiFi();
+
+  // Bunyikan nada beep indikasi sistem aktif
+  playBeep(2, 100);
+}
+
+// ==========================================
+// 5. LOOP UTAMA
+// ==========================================
+void loop() {
+  // Jaga koneksi Wi-Fi tetap aktif
+  if (WiFi.status() != WL_CONNECTED) {
+    digitalWrite(PIN_LED_STATUS, LOW);
+    connectToWiFi();
+  } else {
+    digitalWrite(PIN_LED_STATUS, HIGH);
+  }
+
+  // 1. Baca Sensor Lokal
+  int rainDigital = digitalRead(PIN_RAIN_DIGITAL); // 0 = Air terdeteksi (Active LOW pada modul umum)
+  int rainAnalog  = analogRead(PIN_RAIN_ANALOG);   // Nilai 0 (basah) - 4095 (kering)
+  int ldrAnalog   = analogRead(PIN_LDR_ANALOG);    // Nilai 0 (gelap) - 4095 (terang)
+
+  // Normalisasi: 1 = Hujan/Basah, 0 = Kering
+  int isRainDetected = (rainDigital == LOW || rainAnalog < 2000) ? 1 : 0;
+  
+  // Konversi LDR ke persentase (0 - 100%)
+  int lightPercent = map(ldrAnalog, 0, 4095, 0, 100);
+  lightPercent = constrain(lightPercent, 0, 100);
+
+  // 2. Proteksi Darurat Lokal (Zero Latency Protection):
+  // Jika air menyentuh sensor secara mendadak, langsung tutup atap tanpa menunggu server!
+  if (isRainDetected == 1 && currentRoofStatus != "CLOSED") {
+    Serial.println("\n[DARURAT] Air hujan terdeteksi! Menutup atap jemuran secara instan...");
+    setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", true);
+    playAlertTone();
+  }
+
+  // 3. Kirim Telemetri Sensor ke Server
+  if (millis() - lastSensorUpdate >= SENSOR_INTERVAL) {
+    lastSensorUpdate = millis();
+    sendSensorDataToServer(isRainDetected, lightPercent);
+  }
+
+  // 4. Cek Perintah dari Server (Manual Open/Close, Mode AI, Timer)
+  if (millis() - lastCommandPoll >= COMMAND_INTERVAL) {
+    lastCommandPoll = millis();
+    fetchCommandsFromServer();
+  }
+
+  delay(50);
+}
+
+// ==========================================
+// 6. FUNGSI GERAK MOTOR ATAP JEMURAN
+// ==========================================
+void setRoofPosition(int targetAngle, String statusName, bool smoothMove) {
+  if (smoothMove) {
+    // Gerakan halus (agar mekanisme jemuran awet & tidak tersentak)
+    int step = (targetAngle > currentServoAngle) ? 2 : -2;
+    while (abs(currentServoAngle - targetAngle) > 2) {
+      currentServoAngle += step;
+      roofServo.write(currentServoAngle);
+      delay(15);
+    }
+  }
+  currentServoAngle = targetAngle;
+  roofServo.write(currentServoAngle);
+  currentRoofStatus = statusName;
+
+  Serial.printf("[MOTOR] Status Atap: %s | Posisi Servo: %d Derajat\n", statusName.c_str(), currentServoAngle);
+}
+
+// ==========================================
+// 7. FUNGSI KOMUNIKASI HTTP REST API
+// ==========================================
+void sendSensorDataToServer(int rain, int light) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  String url = SERVER_URL + "?action=update_sensors";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  // Buat Payload JSON
+  StaticJsonDocument<200> doc;
+  doc["rain"] = rain;
+  doc["light"] = light;
+  doc["device_id"] = "esp32_main_controller";
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  int httpCode = http.POST(requestBody);
+  if (httpCode > 0) {
+    String response = http.getString();
+    // Serial.println("[HTTP SENSOR] Response: " + response);
+  } else {
+    Serial.printf("[HTTP SENSOR] Gagal kirim data, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+}
+
+void fetchCommandsFromServer() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  String url = SERVER_URL + "?action=get_command";
+  http.begin(url);
+
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (!error) {
+      String desiredRoofStatus = doc["roof_status"] | "CLOSED";
+      String mode = doc["control_mode"] | "AUTO";
+      int servoAngle = doc["servo_angle"] | 0;
+      int rainDetected = doc["rain_detected"] | 0;
+
+      controlMode = mode;
+
+      // Eksekusi jika ada perbedaan status
+      if (desiredRoofStatus != currentRoofStatus) {
+        Serial.printf("[SERVER CMD] Perintah diterima: %s (Mode: %s)\n", desiredRoofStatus.c_str(), mode.c_str());
+        
+        if (desiredRoofStatus == "OPEN" && rainDetected == 0) {
+          setRoofPosition(SERVO_OPEN_ANGLE, "OPEN", true);
+          playBeep(1, 150);
+        } else {
+          setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", true);
+        }
+      }
+    }
+  }
+  http.end();
+}
+
+// ==========================================
+// 8. FUNGSI AUDIO BUZZER & BEEP
+// ==========================================
+void playBeep(int times, int durationMs) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(PIN_BUZZER, HIGH);
+    delay(durationMs);
+    digitalWrite(PIN_BUZZER, LOW);
+    if (i < times - 1) delay(100);
+  }
+}
+
+void playAlertTone() {
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(PIN_BUZZER, HIGH);
+    delay(200);
+    digitalWrite(PIN_BUZZER, LOW);
+    delay(80);
+  }
+}
+
+// ==========================================
+// 9. KONEKSI WI-FI
+// ==========================================
+void connectToWiFi() {
+  Serial.printf("\n[WIFI] Menghubungkan ke: %s ", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int retry = 0;
+  while (WiFi.status() != WL_CONNECTED && retry < 25) {
+    delay(500);
+    Serial.print(".");
+    retry++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WIFI] Terhubung Berhasil!");
+    Serial.print("[WIFI] IP Address ESP32: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n[WIFI] Gagal terhubung ke Wi-Fi. Akan mencoba lagi...");
+  }
+}
