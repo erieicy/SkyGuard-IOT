@@ -189,13 +189,23 @@ const App = {
         this.updateTimerDisplay(s);
 
         // 8. Latest Camera Photo
-        if (data.latest_photo) {
+        if (data.latest_photo && data.latest_photo.image_path) {
             const photoEl = document.getElementById('latestCameraImage');
-            if (photoEl && photoEl.src !== window.location.origin + '/' + data.latest_photo.image_path) {
+            const placeholderEl = document.getElementById('noPhotoPlaceholder');
+            if (photoEl) {
                 photoEl.src = data.latest_photo.image_path;
+                photoEl.style.display = 'block';
             }
+            if (placeholderEl) placeholderEl.style.display = 'none';
             document.getElementById('latestPhotoTime').innerText = data.latest_photo.timestamp;
             document.getElementById('latestPhotoVerdict').innerText = data.latest_photo.ai_classification;
+        } else {
+            const photoEl = document.getElementById('latestCameraImage');
+            const placeholderEl = document.getElementById('noPhotoPlaceholder');
+            if (photoEl) photoEl.style.display = 'none';
+            if (placeholderEl) placeholderEl.style.display = 'flex';
+            document.getElementById('latestPhotoTime').innerText = 'Belum Ada Foto';
+            document.getElementById('latestPhotoVerdict').innerText = 'SIAP AMBIL FOTO LANGSUNG';
         }
 
         // 9. Telemetry Charts
@@ -467,6 +477,133 @@ const App = {
     }
 };
 
+// ==========================================
+// Direct Live Camera Viewfinder & Shutter (Webcam / Mobile Camera)
+// ==========================================
+const LiveCamera = {
+    stream: null,
+    facingMode: 'environment', // Default to back camera for sky/clouds on smartphones
+
+    open() {
+        const modal = document.getElementById('liveCameraModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        this.startStream();
+    },
+
+    startStream() {
+        const video = document.getElementById('webcamVideo');
+        const statusEl = document.getElementById('cameraStreamStatus');
+        if (!video) return;
+
+        if (this.stream) {
+            this.stream.getTracks().forEach(t => t.stop());
+        }
+
+        if (statusEl) statusEl.innerText = 'Mengakses sensor kamera...';
+
+        const constraints = {
+            video: {
+                facingMode: { ideal: this.facingMode },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        };
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(mediaStream => {
+                    this.stream = mediaStream;
+                    video.srcObject = mediaStream;
+                    video.play();
+                    if (statusEl) {
+                        const modeLabel = this.facingMode === 'environment' ? 'Kamera Belakang (Arah Langit)' : 'Kamera Depan';
+                        statusEl.innerHTML = `<span class="pulse-dot online mr-1.5"></span> Kamera Aktif: ${modeLabel}`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Camera access error:', err);
+                    if (statusEl) statusEl.innerText = 'Gagal akses kamera: ' + err.message;
+                    showToast('Izin kamera ditolak atau tidak didukung pada browser ini.', 'danger');
+                });
+        } else {
+            if (statusEl) statusEl.innerText = 'Browser tidak mendukung akses kamera langsung.';
+            showToast('Browser Anda tidak mendukung WebRTC Camera.', 'danger');
+        }
+    },
+
+    switchFacing() {
+        this.facingMode = (this.facingMode === 'environment') ? 'user' : 'environment';
+        this.startStream();
+    },
+
+    snapPhoto() {
+        const video = document.getElementById('webcamVideo');
+        const canvas = document.getElementById('webcamCanvas');
+        if (!video || !canvas) return;
+
+        // Visual flash effect on viewfinder
+        const flashOverlay = document.getElementById('viewfinderFlash');
+        if (flashOverlay) {
+            flashOverlay.style.opacity = '1';
+            setTimeout(() => flashOverlay.style.opacity = '0', 150);
+        }
+
+        // Play shutter sound
+        AudioAlerts.playBeep(1200, 0.08, 'square');
+
+        // Draw frame to canvas
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert to base64
+        const base64Image = canvas.toDataURL('image/jpeg', 0.88);
+
+        showToast('📸 Foto langsung berhasil diambil! Mengirim ke AI Vision...', 'info');
+
+        // Send to AI analyze endpoint
+        const formData = new FormData();
+        formData.append('image_base64', base64Image);
+        formData.append('source', 'live_direct_camera');
+
+        fetch('api/ai_analyze.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const a = data.analysis;
+                let toastType = 'success';
+                if (a.weather === 'MENDUNG') toastType = 'warning';
+                if (a.weather === 'HUJAN') toastType = 'danger';
+
+                showToast(`Hasil AI: ${a.weather} (${a.light_verdict}) - Keyakinan: ${a.confidence}%`, toastType);
+                App.fetchStatus();
+                this.close();
+            } else {
+                showToast(data.error || 'Gagal analisis AI pada foto', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('AI upload error:', err);
+            showToast('Gagal mengirim foto ke server', 'danger');
+        });
+    },
+
+    close() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(t => t.stop());
+            this.stream = null;
+        }
+        const modal = document.getElementById('liveCameraModal');
+        if (modal) modal.classList.add('hidden');
+    }
+};
+
 // Toast notification helper
 function showToast(message, type = 'info') {
     const toast = document.getElementById('liveToast');
@@ -500,3 +637,4 @@ function showToast(message, type = 'info') {
 
 // Auto start when DOM is ready
 document.addEventListener('DOMContentLoaded', () => App.init());
+
