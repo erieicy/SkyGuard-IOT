@@ -50,9 +50,16 @@ const String SERVER_UPLOAD_URL = "http://192.168.1.100/SkyGuard-AI/api/esp32.php
 
 #define FLASH_LED_PIN      4  // Onboard High-Brightness Flash LED
 
-// Interval Pengambilan Foto Langit (misal: tiap 60 detik)
+// Interval Pengambilan Foto Langit Berkala (misal: tiap 60 detik)
 const unsigned long CAPTURE_INTERVAL = 60000;
 unsigned long lastCaptureTime = 0;
+
+// Interval Polling Perintah Dashboard (setiap 3 detik)
+const unsigned long POLL_INTERVAL = 3000;
+unsigned long lastPollTime = 0;
+
+// URL Server Polling Command
+const String SERVER_COMMAND_URL = "http://192.168.1.100/SkyGuard-AI/api/esp32.php?action=get_command";
 
 // ==========================================
 // 3. SETUP SISTEM
@@ -90,13 +97,35 @@ void loop() {
     connectWiFi();
   }
 
-  // Pengambilan foto berkala untuk analisis AI
+  // 1. Cek perintah snapshot instan dari Dashboard
+  if (millis() - lastPollTime >= POLL_INTERVAL) {
+    lastPollTime = millis();
+    checkRemoteSnapshotTrigger();
+  }
+
+  // 2. Pengambilan foto berkala otomatis
   if (millis() - lastCaptureTime >= CAPTURE_INTERVAL) {
     lastCaptureTime = millis();
     captureAndUploadSkyImage();
   }
 
   delay(100);
+}
+
+void checkRemoteSnapshotTrigger() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(SERVER_COMMAND_URL);
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    if (payload.indexOf("\"trigger_snapshot\":true") >= 0) {
+      Serial.println("\n[DASHBOARD TRIGGER] Perintah ambil foto diterima dari pengguna!");
+      captureAndUploadSkyImage();
+    }
+  }
+  http.end();
 }
 
 // ==========================================
