@@ -1,0 +1,7 @@
+# Ignore SQLite database files but keep directory
+data/*.db
+data/*.db-journal
+
+# Ignore dynamic user uploads but keep sample images
+uploads/sky_*
+uploads/esp32cam_*
