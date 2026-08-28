@@ -60,17 +60,14 @@
                 <i class="fas fa-gauge-high"></i> Dashboard
             </a>
             <a href="history.php" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-2">
-                <i class="fas fa-images"></i> Galeri & Riwayat Foto
-            </a>
-            <a href="firmware.php" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-2">
-                <i class="fas fa-microchip"></i> Firmware ESP32 (.txt)
+                <i class="fas fa-images"></i> Galeri & Riwayat Foto AI
             </a>
         </div>
 
         <!-- Right System Status -->
         <div class="flex items-center gap-3">
-            <button onclick="document.getElementById('simulatorModal').classList.toggle('hidden')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/25 flex items-center gap-2 transition-all">
-                <i class="fas fa-gamepad"></i> <span class="hidden sm:inline">Hardware</span> Simulator
+            <button onclick="document.getElementById('settingsModal').classList.toggle('hidden')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-cyan-500/40 shadow flex items-center gap-2 transition-all">
+                <i class="fas fa-gear text-cyan-400"></i> <span class="hidden sm:inline">Pengaturan</span> AI
             </button>
             <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800">
                 <span id="espStatusDot" class="pulse-dot offline"></span>
@@ -349,10 +346,10 @@
                 <div>
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fas fa-camera text-cyan-400"></i> Kamera Cuaca & Awan AI
+                            <i class="fas fa-camera text-cyan-400"></i> Kamera Modul ESP32-CAM
                         </h3>
-                        <span class="text-[10px] text-slate-400 flex items-center gap-1">
-                            <i class="fas fa-rss text-emerald-400"></i> Live AI Feed
+                        <span id="geminiStatusBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 inline-flex items-center gap-1">
+                            <i class="fas fa-microchip text-cyan-400"></i> AI Vision Engine
                         </span>
                     </div>
 
@@ -361,39 +358,39 @@
                         <img id="latestCameraImage" src="" alt="Live Sky View" class="camera-feed-img" style="display: none;">
                         <div id="noPhotoPlaceholder" class="flex flex-col items-center justify-center p-6 text-slate-500 text-center">
                             <i class="fas fa-camera-viewfinder text-3xl mb-2 text-cyan-500/40"></i>
-                            <p class="text-xs font-semibold text-slate-400">Belum Ada Tangkapan Foto</p>
-                            <p class="text-[10px] text-slate-500 mt-0.5">Gunakan tombol di bawah untuk memfoto cuaca secara langsung.</p>
+                            <p class="text-xs font-semibold text-slate-400">Belum Ada Tangkapan Foto ESP32</p>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Modul ESP32-CAM akan mengirimkan foto secara otomatis atau saat dipicu.</p>
                         </div>
                         <div class="camera-overlay-badge">
                             <span class="pulse-dot online"></span>
-                            <span id="latestPhotoTime">Kamera Siap</span>
+                            <span id="latestPhotoTime">Kamera Standby</span>
                         </div>
                     </div>
 
                     <!-- AI Verdict Summary -->
                     <div class="ai-verdict-banner mb-3">
                         <div class="flex items-center justify-between text-xs mb-1">
-                            <span class="text-slate-400">Klasifikasi Terakhir:</span>
+                            <span class="text-slate-400">Klasifikasi AI Terakhir:</span>
                             <span id="latestPhotoVerdict" class="font-bold text-cyan-300">MENUNGGU FOTO</span>
                         </div>
-                        <p class="text-[11px] text-slate-400">AI mengecek apakah mendung sebelum membuka atap jemuran.</p>
+                        <p class="text-[11px] text-slate-400">AI memeriksa matahari vs lampu & awan mendung secara langsung.</p>
                     </div>
                 </div>
 
-                <!-- Direct Snap & Upload Actions -->
+                <!-- Camera Trigger Actions -->
                 <div class="space-y-2">
-                    <button onclick="LiveCamera.open()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition-all">
-                        <i class="fas fa-camera text-base"></i> Foto Cuaca & Awan Langsung
+                    <button onclick="App.triggerEsp32CamSnapshot()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition-all">
+                        <i class="fas fa-tower-broadcast text-base"></i> Minta ESP32-CAM Ambil Foto
                     </button>
                     
                     <div class="grid grid-cols-2 gap-2">
+                        <button onclick="LiveCamera.open()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">
+                            <i class="fas fa-camera text-xs text-cyan-400"></i> Kamera HP/Webcam
+                        </button>
                         <label class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 cursor-pointer transition-all">
-                            <i class="fas fa-folder-open text-xs"></i> Pilih File
+                            <i class="fas fa-folder-open text-xs"></i> Unggah Foto
                             <input type="file" accept="image/*" class="hidden" onchange="App.uploadUserPhoto(this)">
                         </label>
-                        <button onclick="Simulator.simulateAIPreset('mendung')" class="px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5">
-                            <i class="fas fa-cloud-bolt text-xs"></i> Tes Mendung
-                        </button>
                     </div>
                 </div>
             </div>
@@ -508,6 +505,45 @@
         </div>
     </div>
 
+    <!-- AI Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-panel w-full max-w-md p-6 bg-slate-900/95 border-cyan-500/40 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
+                        <i class="fas fa-gear"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-100">Pengaturan AI Vision Engine</h3>
+                        <p class="text-[11px] text-slate-400">Konfigurasi Google Gemini Vision API</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="font-bold text-slate-200 block mb-1.5">Google Gemini API Key (Opsional):</label>
+                    <input type="password" id="geminiApiKeyInput" placeholder="Masukkan Google AI Studio API Key..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                    <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        Jika diisi, analisis foto ESP32-CAM menggunakan <strong>Google Gemini Vision AI</strong>. Jika dikosongkan, sistem menggunakan <strong>AI Vision Engine Lokal</strong>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-5 pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+                <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-all">
+                    Batal
+                </button>
+                <button onclick="App.saveGeminiKey()" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition-all">
+                    Simpan Pengaturan
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Mobile Bottom Sticky Navigation Bar -->
     <div class="sm:hidden mobile-bottom-nav">
         <a href="index.php" class="mobile-nav-item active">
@@ -519,89 +555,12 @@
         </button>
         <a href="history.php" class="mobile-nav-item">
             <i class="fas fa-images"></i>
-            <span>Riwayat</span>
+            <span>Riwayat AI</span>
         </a>
-        <a href="firmware.php" class="mobile-nav-item">
-            <i class="fas fa-microchip"></i>
-            <span>ESP32</span>
-        </a>
-    </div>
-
-    <!-- Embedded Hardware Simulator Modal / Drawer -->
-    <div id="simulatorModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-        <div class="glass-panel w-full max-w-lg p-6 bg-slate-900/95 border-violet-500/40 shadow-2xl relative">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
-                        <i class="fas fa-gamepad"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-100">IoT Hardware Simulator</h3>
-                        <p class="text-[11px] text-slate-400">Uji seluruh fitur SkyGuard AI tanpa perangkat fisik</p>
-                    </div>
-                </div>
-                <button onclick="document.getElementById('simulatorModal').classList.add('hidden')" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
-            </div>
-
-            <div class="space-y-4 text-xs">
-                <!-- Rain Sensor Simulation -->
-                <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700">
-                    <label class="font-bold text-slate-200 block mb-2">1. Simulasi Sensor Air / Hujan:</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="Simulator.simulateRain(true)" class="py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-all flex items-center justify-center gap-2">
-                            <i class="fas fa-droplet"></i> Teteskan Air (Hujan)
-                        </button>
-                        <button onclick="Simulator.simulateRain(false)" class="py-2 px-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold transition-all flex items-center justify-center gap-2">
-                            <i class="fas fa-sun"></i> Keringkan Sensor
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Light Sensor Slider Simulation -->
-                <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700">
-                    <div class="flex justify-between items-center mb-1.5">
-                        <label class="font-bold text-slate-200">2. Intensitas Sensor Cahaya (LDR):</label>
-                        <span id="simLightVal" class="font-bold text-amber-400">75%</span>
-                    </div>
-                    <input type="range" min="0" max="100" value="75" oninput="Simulator.simulateLight(this.value)" class="w-full accent-amber-500 cursor-pointer">
-                    <div class="flex justify-between text-[10px] text-slate-400 mt-1">
-                        <span>0% (Gelap Gulita)</span>
-                        <span>50% (Redup)</span>
-                        <span>100% (Terik)</span>
-                    </div>
-                </div>
-
-                <!-- AI Vision Preset Presets -->
-                <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700">
-                    <label class="font-bold text-slate-200 block mb-2">3. Uji Preset AI Vision Kamera:</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="Simulator.simulateAIPreset('cerah')" class="py-1.5 px-2.5 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-500/40 font-semibold transition-all">
-                            ☀️ Matahari Cerah
-                        </button>
-                        <button onclick="Simulator.simulateAIPreset('mendung')" class="py-1.5 px-2.5 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 font-semibold transition-all">
-                            ☁️ Awan Mendung
-                        </button>
-                        <button onclick="Simulator.simulateAIPreset('lampu')" class="py-1.5 px-2.5 rounded-lg bg-orange-600/30 hover:bg-orange-600/50 text-orange-200 border border-orange-500/40 font-semibold transition-all">
-                            💡 Lampu Ruangan
-                        </button>
-                        <button onclick="Simulator.simulateAIPreset('malam')" class="py-1.5 px-2.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 font-semibold transition-all">
-                            🌙 Malam Hari
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                <button onclick="Simulator.reset()" class="text-xs text-slate-400 hover:text-slate-200 underline">
-                    <i class="fas fa-rotate-left"></i> Reset ke Default
-                </button>
-                <button onclick="document.getElementById('simulatorModal').classList.add('hidden')" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-all">
-                    Tutup Simulator
-                </button>
-            </div>
-        </div>
+        <button onclick="document.getElementById('settingsModal').classList.remove('hidden')" class="mobile-nav-item">
+            <i class="fas fa-gear"></i>
+            <span>Pengaturan</span>
+        </button>
     </div>
 
     <!-- Live Toast Notification Container -->
@@ -612,7 +571,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/simulator.js"></script>
     <script src="assets/js/app.js"></script>
 </body>
 </html>
