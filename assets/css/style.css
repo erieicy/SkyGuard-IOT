@@ -1,0 +1,465 @@
+/* 
+ ============================================================================
+  SkyGuard AI - Modern Futuristic IoT Glassmorphism Stylesheet
+ ============================================================================
+*/
+
+:root {
+  --bg-primary: #0b0f19;
+  --bg-secondary: #111827;
+  --bg-card: rgba(17, 24, 39, 0.75);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --border-glass: rgba(255, 255, 255, 0.1);
+  --border-glow: rgba(56, 189, 248, 0.3);
+
+  --accent-cyan: #06b6d4;
+  --accent-sky: #38bdf8;
+  --accent-amber: #f59e0b;
+  --accent-emerald: #10b981;
+  --accent-rose: #f43f5e;
+  --accent-violet: #8b5cf6;
+
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
+
+  --shadow-neon-cyan: 0 0 25px rgba(6, 182, 212, 0.35);
+  --shadow-neon-amber: 0 0 25px rgba(245, 158, 11, 0.35);
+  --shadow-neon-rose: 0 0 25px rgba(244, 63, 94, 0.35);
+  --shadow-neon-emerald: 0 0 25px rgba(16, 185, 129, 0.35);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+    linear-gradient(180deg, #0b0f19 0%, #080b12 100%);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Containers */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: var(--border-glow);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.1);
+}
+
+/* Glowing Neon Elements */
+.glow-cyan {
+  box-shadow: var(--shadow-neon-cyan);
+}
+.glow-amber {
+  box-shadow: var(--shadow-neon-amber);
+}
+.glow-rose {
+  box-shadow: var(--shadow-neon-rose);
+}
+.glow-emerald {
+  box-shadow: var(--shadow-neon-emerald);
+}
+
+/* Navbar */
+.navbar-custom {
+  background: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-glass);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Roof Visualizer Station */
+.roof-visualizer-box {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Sky Backgrounds for Roof Visualizer */
+.roof-visualizer-box.sky-sunny {
+  background: linear-gradient(180deg, #0284c7 0%, #38bdf8 60%, #bae6fd 100%);
+}
+.roof-visualizer-box.sky-cloudy {
+  background: linear-gradient(180deg, #334155 0%, #64748b 70%, #94a3b8 100%);
+}
+.roof-visualizer-box.sky-rainy {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+}
+.roof-visualizer-box.sky-night {
+  background: linear-gradient(180deg, #030712 0%, #0b0f19 70%, #111827 100%);
+}
+.roof-visualizer-box.sky-lamp {
+  background: linear-gradient(180deg, #292524 0%, #44403c 70%, #78716c 100%);
+}
+
+/* Animated Sun */
+.sun-orb {
+  position: absolute;
+  top: 25px;
+  right: 40px;
+  width: 65px;
+  height: 65px;
+  background: radial-gradient(circle, #fef08a 20%, #eab308 70%, #ca8a04 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 45px #facc15, 0 0 80px rgba(250, 204, 21, 0.6);
+  animation: sunPulse 4s ease-in-out infinite alternate;
+  transition: opacity 0.5s ease;
+}
+
+@keyframes sunPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 35px #facc15; }
+  100% { transform: scale(1.08); box-shadow: 0 0 65px #facc15, 0 0 95px rgba(250, 204, 21, 0.7); }
+}
+
+/* Animated Rain Drops */
+.rain-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.raindrop {
+  position: absolute;
+  width: 2px;
+  height: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(186, 230, 253, 0.9) 100%);
+  border-radius: 2px;
+  animation: dropFall 0.75s linear infinite;
+}
+
+@keyframes dropFall {
+  0% { transform: translateY(-30px); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(330px); opacity: 0.2; }
+}
+
+/* SVG Clothesline Structure & Canopy */
+.clothesline-structure {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+  height: 240px;
+}
+
+/* Roof Canopy Mechanism Animations */
+.canopy-left, .canopy-right {
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease;
+  transform-origin: top;
+}
+
+.roof-state-open .canopy-left {
+  transform: translateX(-120px) scaleX(0.15);
+  opacity: 0.2;
+}
+.roof-state-open .canopy-right {
+  transform: translateX(120px) scaleX(0.15);
+  opacity: 0.2;
+}
+
+.roof-state-closed .canopy-left {
+  transform: translateX(0) scaleX(1);
+  opacity: 1;
+}
+.roof-state-closed .canopy-right {
+  transform: translateX(0) scaleX(1);
+  opacity: 1;
+}
+
+.roof-state-opening .canopy-left, .roof-state-closing .canopy-left,
+.roof-state-opening .canopy-right, .roof-state-closing .canopy-right {
+  animation: roofMoving 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes roofMoving {
+  0% { transform: scaleX(0.6); }
+  100% { transform: scaleX(0.9); }
+}
+
+/* Clothes Swaying Animation */
+.clothes-item {
+  transform-origin: top center;
+  animation: clothesSway 3.5s ease-in-out infinite alternate;
+}
+.clothes-item:nth-child(2) {
+  animation-duration: 4.2s;
+  animation-delay: -1s;
+}
+.clothes-item:nth-child(3) {
+  animation-duration: 3.8s;
+  animation-delay: -2s;
+}
+
+@keyframes clothesSway {
+  0% { transform: rotate(-3deg); }
+  100% { transform: rotate(3.5deg); }
+}
+
+/* Mode Switcher Buttons */
+.mode-pill-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-glass);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+
+.mode-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.mode-pill-btn.active-auto {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.5);
+}
+
+.mode-pill-btn.active-manual {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+}
+
+.mode-pill-btn.active-timer {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+}
+
+/* Control Buttons */
+.btn-action-open {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 14px 24px;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s ease;
+}
+.btn-action-open:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(16, 185, 129, 0.5);
+}
+
+.btn-action-close {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: white;
+  border: none;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 14px 24px;
+  box-shadow: 0 4px 20px rgba(244, 63, 94, 0.35);
+  transition: all 0.2s ease;
+}
+.btn-action-close:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(244, 63, 94, 0.5);
+}
+
+/* Status Badges */
+.badge-status {
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-status-open {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-status-closed {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.badge-status-moving {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Sensor Telemetry Cards */
+.sensor-metric-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sensor-metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+  opacity: 0.7;
+}
+
+/* Pulse Dot */
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+}
+
+.pulse-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.pulse-dot.online::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #10b981;
+  animation: pulseAnim 2s infinite;
+}
+
+.pulse-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+}
+
+@keyframes pulseAnim {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Stopwatch Countdown Ring */
+.timer-countdown-box {
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(15, 23, 42, 0.6) 80%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+}
+
+.timer-digits {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: #c4b5fd;
+  text-shadow: 0 0 20px rgba(167, 139, 250, 0.5);
+  letter-spacing: 2px;
+}
+
+/* Camera Live View Box */
+.camera-feed-box {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-feed-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-overlay-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* AI Classification Badge Banner */
+.ai-verdict-banner {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(11, 15, 25, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
