@@ -349,7 +349,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-                            <i class="fas fa-camera text-cyan-400"></i> Kamera Cuaca ESP32-CAM
+                            <i class="fas fa-camera text-cyan-400"></i> Kamera Cuaca & Awan AI
                         </h3>
                         <span class="text-[10px] text-slate-400 flex items-center gap-1">
                             <i class="fas fa-rss text-emerald-400"></i> Live AI Feed
@@ -358,10 +358,15 @@
 
                     <!-- Camera Feed Box -->
                     <div class="camera-feed-box mb-3">
-                        <img id="latestCameraImage" src="assets/images/default_sky.jpg" onerror="this.src='https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=640&auto=format&fit=crop&q=60'" alt="ESP32 Sky View" class="camera-feed-img">
+                        <img id="latestCameraImage" src="" alt="Live Sky View" class="camera-feed-img" style="display: none;">
+                        <div id="noPhotoPlaceholder" class="flex flex-col items-center justify-center p-6 text-slate-500 text-center">
+                            <i class="fas fa-camera-viewfinder text-3xl mb-2 text-cyan-500/40"></i>
+                            <p class="text-xs font-semibold text-slate-400">Belum Ada Tangkapan Foto</p>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Gunakan tombol di bawah untuk memfoto cuaca secara langsung.</p>
+                        </div>
                         <div class="camera-overlay-badge">
                             <span class="pulse-dot online"></span>
-                            <span id="latestPhotoTime">Auto AI Vision Active</span>
+                            <span id="latestPhotoTime">Kamera Siap</span>
                         </div>
                     </div>
 
@@ -369,21 +374,27 @@
                     <div class="ai-verdict-banner mb-3">
                         <div class="flex items-center justify-between text-xs mb-1">
                             <span class="text-slate-400">Klasifikasi Terakhir:</span>
-                            <span id="latestPhotoVerdict" class="font-bold text-cyan-300">CERAH (SUNLIGHT)</span>
+                            <span id="latestPhotoVerdict" class="font-bold text-cyan-300">MENUNGGU FOTO</span>
                         </div>
-                        <p class="text-[11px] text-slate-400">AI otomatis mengecek apakah mendung sebelum membuka jemuran.</p>
+                        <p class="text-[11px] text-slate-400">AI mengecek apakah mendung sebelum membuka atap jemuran.</p>
                     </div>
                 </div>
 
-                <!-- User Snapshot & Upload Actions -->
+                <!-- Direct Snap & Upload Actions -->
                 <div class="space-y-2">
-                    <label class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 border border-cyan-500/30 cursor-pointer transition-all shadow">
-                        <i class="fas fa-cloud-arrow-up text-sm"></i> Ambil / Upload Foto Cuaca Awan
-                        <input type="file" accept="image/*" class="hidden" onchange="App.uploadUserPhoto(this)">
-                    </label>
-                    <button onclick="Simulator.simulateAIPreset('mendung')" class="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all flex items-center justify-center gap-2">
-                        <i class="fas fa-cloud-bolt text-xs"></i> Uji Deteksi Awan Mendung (Simulasi)
+                    <button onclick="LiveCamera.open()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition-all">
+                        <i class="fas fa-camera text-base"></i> Foto Cuaca & Awan Langsung
                     </button>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 cursor-pointer transition-all">
+                            <i class="fas fa-folder-open text-xs"></i> Pilih File
+                            <input type="file" accept="image/*" class="hidden" onchange="App.uploadUserPhoto(this)">
+                        </label>
+                        <button onclick="Simulator.simulateAIPreset('mendung')" class="px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5">
+                            <i class="fas fa-cloud-bolt text-xs"></i> Tes Mendung
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -438,6 +449,83 @@
         </div>
 
     </main>
+
+    <!-- Direct Live Camera Viewfinder Modal -->
+    <div id="liveCameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4">
+        <div class="glass-panel w-full max-w-lg p-5 bg-slate-900/95 border-cyan-500/40 shadow-2xl relative flex flex-col justify-between max-h-[90vh]">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-100">Kamera Cuaca & Awan Langsung</h3>
+                        <p id="cameraStreamStatus" class="text-[11px] text-cyan-300 flex items-center gap-1">Mengakses sensor kamera...</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="LiveCamera.switchFacing()" title="Ganti Kamera Depan/Belakang" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all">
+                        <i class="fas fa-camera-rotate text-xs"></i>
+                    </button>
+                    <button onclick="LiveCamera.close()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Viewfinder Box -->
+            <div class="viewfinder-container my-2 relative">
+                <video id="webcamVideo" autoplay playsinline class="viewfinder-video"></video>
+                
+                <!-- Rule of thirds grid & corner brackets -->
+                <div class="viewfinder-grid-overlay"></div>
+                <div class="viewfinder-corner-tl"></div>
+                <div class="viewfinder-corner-tr"></div>
+                <div class="viewfinder-corner-bl"></div>
+                <div class="viewfinder-corner-br"></div>
+                
+                <!-- Flash visual effect -->
+                <div id="viewfinderFlash" class="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity duration-150"></div>
+            </div>
+
+            <!-- Hidden Canvas for frame snapshot -->
+            <canvas id="webcamCanvas" class="hidden"></canvas>
+
+            <!-- Camera Shutter Control Footer -->
+            <div class="pt-3 border-t border-slate-800 flex flex-col items-center gap-2">
+                <div class="flex items-center justify-center gap-4 w-full">
+                    <button onclick="LiveCamera.snapPhoto()" class="shutter-btn" title="Ambil Foto Cuaca Sekarang">
+                        <div class="shutter-btn-inner">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 text-center">
+                    Arahkan kamera ke langit/awan, lalu tekan tombol untuk analisis AI seketika
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Bottom Sticky Navigation Bar -->
+    <div class="sm:hidden mobile-bottom-nav">
+        <a href="index.php" class="mobile-nav-item active">
+            <i class="fas fa-gauge-high"></i>
+            <span>Dashboard</span>
+        </a>
+        <button onclick="LiveCamera.open()" class="mobile-snap-btn-center" title="Foto Langsung">
+            <i class="fas fa-camera"></i>
+        </button>
+        <a href="history.php" class="mobile-nav-item">
+            <i class="fas fa-images"></i>
+            <span>Riwayat</span>
+        </a>
+        <a href="firmware.php" class="mobile-nav-item">
+            <i class="fas fa-microchip"></i>
+            <span>ESP32</span>
+        </a>
+    </div>
 
     <!-- Embedded Hardware Simulator Modal / Drawer -->
     <div id="simulatorModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
