@@ -20,7 +20,7 @@ $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? 'get_command';
 
 // 1. ESP32 Polling & Command Retrieval
-if ($action === 'get_command' || $_SERVER['REQUEST_METHOD'] === 'GET') {
+if ($action === 'get_command' || ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
     // Update heartbeat
     $pdo->exec("UPDATE device_state SET esp32_last_seen = datetime('now', 'localtime') WHERE id = 1");
 
@@ -29,6 +29,14 @@ if ($action === 'get_command' || $_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $servoAngle = ($state['roof_status'] === 'OPEN') ? 180 : 0;
 
+    // Check if snapshot requested
+    $snapCheck = $pdo->query("SELECT value FROM settings WHERE key = 'trigger_cam_capture'")->fetchColumn();
+    $triggerSnapshot = ($snapCheck == '1');
+
+    if ($triggerSnapshot) {
+        $pdo->exec("UPDATE settings SET value = '0' WHERE key = 'trigger_cam_capture'");
+    }
+
     echo json_encode([
         'status' => 'ok',
         'roof_status' => $state['roof_status'],      // OPEN or CLOSED
@@ -36,7 +44,18 @@ if ($action === 'get_command' || $_SERVER['REQUEST_METHOD'] === 'GET') {
         'control_mode' => $state['control_mode'],     // AUTO, MANUAL, TIMER
         'rain_detected' => (int)$state['rain_detected'],
         'auto_close_mendung' => (int)$state['auto_close_on_mendung'],
+        'trigger_snapshot' => $triggerSnapshot,
         'server_time' => date('Y-m-d H:i:s')
+    ]);
+    exit;
+}
+
+// Trigger snapshot request from Dashboard to ESP32-CAM
+if ($action === 'request_snapshot') {
+    $pdo->exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('trigger_cam_capture', '1')");
+    echo json_encode([
+        'success' => true,
+        'message' => 'Perintah ambil foto telah dikirim ke modul ESP32-CAM'
     ]);
     exit;
 }
