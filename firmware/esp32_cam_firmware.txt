@@ -1,0 +1,228 @@
+/*
+ ============================================================================
+  SkyGuard AI - ESP32-CAM AI Vision Snapshot Firmware
+  Project: Smart Automated Clothesline (Jemuran Baju Pintar IoT)
+  File: esp32_cam_firmware.txt
+  Target Board: AI-Thinker ESP32-CAM (OV2640 Sensor)
+  Author: SkyGuard AI Team
+ ============================================================================
+  DESKRIPSI:
+  ESP32-CAM bertugas mengambil foto langit/awan atau sumber cahaya ketika 
+  sensor cahaya mendeteksi intensitas terang. Foto kemudian dikirimkan 
+  ke server SkyGuard AI untuk dianalisis oleh AI (membedakan matahari asli 
+  vs lampu listrik ruangan, serta mendeteksi awan mendung / hujan).
+ ============================================================================
+*/
+
+#include "esp_camera.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ==========================================
+// 1. PENGATURAN WI-FI & SERVER
+// ==========================================
+const char* WIFI_SSID     = "NAMA_WIFI_ANDA";
+const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";
+
+// URL Endpoint Upload Gambar SkyGuard AI
+const String SERVER_UPLOAD_URL = "http://192.168.1.100/SkyGuard-AI/api/esp32.php?action=upload_cam";
+
+// ==========================================
+// 2. PINOUT CAMERA AI-THINKER ESP32-CAM
+// ==========================================
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM      0
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
+
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       21
+#define Y4_GPIO_NUM       19
+#define Y3_GPIO_NUM       18
+#define Y2_GPIO_NUM        5
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
+
+#define FLASH_LED_PIN      4  // Onboard High-Brightness Flash LED
+
+// Interval Pengambilan Foto Langit (misal: tiap 60 detik)
+const unsigned long CAPTURE_INTERVAL = 60000;
+unsigned long lastCaptureTime = 0;
+
+// ==========================================
+// 3. SETUP SISTEM
+// ==========================================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n===========================================");
+  Serial.println("  SKYGUARD AI - ESP32-CAM VISION BOOTING   ");
+  Serial.println("===========================================");
+
+  pinMode(FLASH_LED_PIN, OUTPUT);
+  digitalWrite(FLASH_LED_PIN, LOW);
+
+  // Inisialisasi Kamera OV2640
+  if (!initCamera()) {
+    Serial.println("[ERROR] Inisialisasi Kamera GAGAL! Periksa modul kamera.");
+    while (true) { delay(1000); }
+  }
+  Serial.println("[KAMERA] OV2640 Berhasil Diinisialisasi!");
+
+  // Koneksi Wi-Fi
+  connectWiFi();
+
+  // Ambil foto pertama setelah boot
+  delay(2000);
+  captureAndUploadSkyImage();
+}
+
+// ==========================================
+// 4. LOOP UTAMA
+// ==========================================
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
+
+  // Pengambilan foto berkala untuk analisis AI
+  if (millis() - lastCaptureTime >= CAPTURE_INTERVAL) {
+    lastCaptureTime = millis();
+    captureAndUploadSkyImage();
+  }
+
+  delay(100);
+}
+
+// ==========================================
+// 5. INISIALISASI KAMERA
+// ==========================================
+bool initCamera() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+
+  // Sesuaikan resolusi & buffer untuk kestabilan RAM
+  if (psramFound()) {
+    config.frame_size = FRAMESIZE_VGA; // 640x480 (Ideal untuk AI Vision)
+    config.jpeg_quality = 12;          // 0-63, makin kecil kualitas makin tinggi
+    config.fb_count = 2;
+  } else {
+    config.frame_size = FRAMESIZE_QVGA; // 320x240
+    config.jpeg_quality = 15;
+    config.fb_count = 1;
+  }
+
+  esp_err_t err = esp_camera_init(&config);
+  return (err == ESP_OK);
+}
+
+// ==========================================
+// 6. AMBIL FOTO & UPLOAD MULTIPART KE SERVER
+// ==========================================
+void captureAndUploadSkyImage() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  Serial.println("\n[KAMERA] Mengambil foto kondisi langit / cuaca...");
+  
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("[ERROR] Gagal mengambil frame kamera!");
+    return;
+  }
+
+  Serial.printf("[KAMERA] Foto berhasil diambil! Ukuran buffer: %u bytes\n", fb->len);
+
+  // Buat HTTP Client untuk multipart/form-data
+  WiFiClient client;
+  HTTPClient http;
+
+  if (http.begin(client, SERVER_UPLOAD_URL)) {
+    String boundary = "----WebKitFormBoundarySkyGuardAI" + String(millis());
+    http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+    // Siapkan body multipart
+    String head = "--" + boundary + "\r\n" +
+                  "Content-Disposition: form-data; name=\"source\"\r\n\r\n" +
+                  "esp32_cam\r\n" +
+                  "--" + boundary + "\r\n" +
+                  "Content-Disposition: form-data; name=\"image\"; filename=\"esp32_sky.jpg\"\r\n" +
+                  "Content-Type: image/jpeg\r\n\r\n";
+
+    String tail = "\r\n--" + boundary + "--\r\n";
+
+    size_t totalLen = head.length() + fb->len + tail.length();
+
+    // Alokasi buffer gabungan untuk transmisi cepat
+    uint8_t * payload = (uint8_t *)malloc(totalLen);
+    if (payload != NULL) {
+      memcpy(payload, head.c_str(), head.length());
+      memcpy(payload + head.length(), fb->buf, fb->len);
+      memcpy(payload + head.length() + fb->len, tail.c_str(), tail.length());
+
+      Serial.println("[HTTP UPLOAD] Mengunggah foto ke SkyGuard AI Server...");
+      int httpResponseCode = http.POST(payload, totalLen);
+
+      if (httpResponseCode > 0) {
+        String response = http.getString();
+        Serial.printf("[HTTP UPLOAD] Sukses! Response Code: %d\n", httpResponseCode);
+        Serial.println("[AI VERDICT] " + response);
+      } else {
+        Serial.printf("[ERROR] Gagal upload foto. HTTP Error: %s\n", http.errorToString(httpResponseCode).c_str());
+      }
+
+      free(payload);
+    } else {
+      Serial.println("[ERROR] Kehabisan memori untuk buffer multipart!");
+    }
+
+    http.end();
+  }
+
+  esp_camera_fb_return(fb); // Bersihkan buffer kamera
+}
+
+// ==========================================
+// 7. KONEKSI WI-FI
+// ==========================================
+void connectWiFi() {
+  Serial.printf("[WIFI] Menghubungkan ESP32-CAM ke: %s ", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    Serial.print(".");
+    tries++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WIFI] Terhubung! IP ESP32-CAM: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\n[WIFI] Gagal terhubung ke Wi-Fi!");
+  }
+}
