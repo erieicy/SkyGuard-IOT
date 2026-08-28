@@ -78,10 +78,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                 <i class="fas fa-gauge-high"></i> Dashboard
             </a>
             <a href="history.php" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-2">
-                <i class="fas fa-images"></i> Galeri & Riwayat Foto
-            </a>
-            <a href="firmware.php" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-2">
-                <i class="fas fa-microchip"></i> Firmware ESP32 (.txt)
+                <i class="fas fa-images"></i> Galeri & Riwayat Foto AI
             </a>
         </div>
 
@@ -262,11 +259,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         </a>
         <a href="history.php" class="mobile-nav-item active">
             <i class="fas fa-images"></i>
-            <span>Riwayat</span>
-        </a>
-        <a href="firmware.php" class="mobile-nav-item">
-            <i class="fas fa-microchip"></i>
-            <span>ESP32</span>
+            <span>Riwayat AI</span>
         </a>
     </div>
 
