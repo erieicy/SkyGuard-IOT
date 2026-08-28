@@ -53,6 +53,7 @@ const App = {
         console.log('Initializing SkyGuard AI Dashboard...');
         initTelemetryChart();
         this.fetchStatus();
+        this.loadSettings();
         
         // Start live polling loop every 1.8 seconds
         pollTimer = setInterval(() => this.fetchStatus(), 1800);
@@ -439,11 +440,11 @@ const App = {
         if (!fileInput.files || fileInput.files.length === 0) return;
         const file = fileInput.files[0];
 
-        showToast('📸 Mengunggah foto awan & menganalisis dengan AI Vision...', 'info');
+        showToast('📸 Mengunggah foto awan & menganalisis dengan AI Vision API...', 'info');
 
         const formData = new FormData();
         formData.append('image', file);
-        formData.append('source', 'user_upload');
+        formData.append('source', 'esp32_cam');
 
         fetch('api/ai_analyze.php', {
             method: 'POST',
@@ -457,13 +458,78 @@ const App = {
                 if (a.weather === 'MENDUNG') toastType = 'warning';
                 if (a.weather === 'HUJAN') toastType = 'danger';
 
-                showToast(`AI Verdict: ${a.weather} (${a.light_verdict}) - Keyakinan: ${a.confidence}%`, toastType);
+                showToast(`Hasil AI (${a.engine || 'Vision'}): ${a.weather} (${a.light_verdict}) - Keyakinan: ${a.confidence}%`, toastType);
                 this.fetchStatus();
             } else {
                 showToast(data.error || 'Gagal menganalisis foto', 'danger');
             }
         })
         .catch(err => console.error('Upload error:', err));
+    },
+
+    triggerEsp32CamSnapshot() {
+        showToast('📡 Mengirim sinyal ke modul ESP32-CAM untuk mengambil foto...', 'info');
+        
+        fetch('api/esp32.php?action=request_snapshot', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ Sinyal terkirim! Menunggu ESP32-CAM mengunggah foto ke AI...', 'success');
+                } else {
+                    showToast('Gagal mengirim sinyal ke ESP32-CAM', 'danger');
+                }
+            })
+            .catch(err => {
+                console.error('Trigger error:', err);
+                showToast('Gagal komunikasi dengan server', 'danger');
+            });
+    },
+
+    loadSettings() {
+        fetch('api/settings.php?action=get_settings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const badge = document.getElementById('geminiStatusBadge');
+                    const keyInput = document.getElementById('geminiApiKeyInput');
+                    if (data.settings.has_gemini_key) {
+                        if (badge) {
+                            badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
+                            badge.innerHTML = '<i class="fas fa-sparkles text-emerald-400"></i> Google Gemini Vision API Aktif';
+                        }
+                        if (keyInput) keyInput.placeholder = 'API Key Tersimpan (' + data.settings.masked_gemini_key + ')';
+                    } else {
+                        if (badge) {
+                            badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 inline-flex items-center gap-1';
+                            badge.innerHTML = '<i class="fas fa-microchip text-cyan-400"></i> AI Vision Engine Aktif';
+                        }
+                        if (keyInput) keyInput.placeholder = 'Masukkan Google AI Studio Key (Opsional)';
+                    }
+                }
+            })
+            .catch(err => console.error(err));
+    },
+
+    saveGeminiKey() {
+        const input = document.getElementById('geminiApiKeyInput');
+        const key = input ? input.value.trim() : '';
+
+        fetch('api/settings.php?action=save_gemini_key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: key })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                this.loadSettings();
+                document.getElementById('settingsModal')?.classList.add('hidden');
+            } else {
+                showToast('Gagal menyimpan API key', 'danger');
+            }
+        })
+        .catch(err => console.error(err));
     },
 
     clearAlerts() {
