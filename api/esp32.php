@@ -21,8 +21,8 @@ $action = $_GET['action'] ?? $_POST['action'] ?? 'get_command';
 
 // 1. ESP32 Polling & Command Retrieval
 if ($action === 'get_command' || ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
-    // Update heartbeat
-    $pdo->exec("UPDATE device_state SET esp32_last_seen = datetime('now', 'localtime') WHERE id = 1");
+    // Update heartbeat (UTC agar konsisten dengan pengecekan status.php)
+    $pdo->exec("UPDATE device_state SET esp32_last_seen = datetime('now') WHERE id = 1");
 
     $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
     $state = $stmt->fetch();
@@ -102,7 +102,7 @@ if ($action === 'update_sensors') {
             light_level = ?,
             roof_status = ?,
             last_action_reason = ?,
-            esp32_last_seen = datetime('now', 'localtime'),
+            esp32_last_seen = datetime('now'),
             updated_at = datetime('now', 'localtime')
         WHERE id = 1
     ");
@@ -153,7 +153,8 @@ if ($action === 'upload_cam') {
         }
     }
 
-    // Call AI analyzer logic
+    // Call AI analyzer logic (file sudah disimpan -> lewat GLOBALS agar tidak baca ulang php://input)
+    $GLOBALS['skyguard_uploaded_file'] = $targetPath;
     require_once __DIR__ . '/ai_analyze.php';
     exit;
 }

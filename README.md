@@ -14,8 +14,9 @@
 1. **Proteksi Air & Hujan Instan (*Zero Latency*)**:
    - Sensor air/hujan (*Raindrop Sensor*) memantau tetesan air. Jika air menyentuh sensor, motor atap jemuran langsung menutup otomatis secara darurat dan membunyikan alarm peringatan.
 2. **AI Vision: Matahari Alami vs Lampu Listrik**:
-   - Ketika sensor LDR mendeteksi cahaya, modul ESP32-CAM mengambil citra.
-   - Algoritma AI menganalisis spektrum pencahayaan untuk membedakan antara sinar matahari alami (membuka atap) dan cahaya lampu ruangan biasa (tetap menutup atap).
+    - Ketika sensor LDR mendeteksi cahaya, modul ESP32-CAM mengambil citra.
+    - Algoritma AI menganalisis spektrum pencahayaan untuk membedakan antara sinar matahari alami (membuka atap) dan cahaya lampu ruangan biasa (tetap menutup atap).
+    - **Mesin AI multi-provider**: *Local AI Vision Engine* (offline, tanpa API key), **Google Gemini Vision**, atau **OpenAI Vision**. Pilih di menu Pengaturan AI.
 3. **Deteksi Awan Mendung (*Overcast Protection*)**:
    - Pengguna atau ESP32-CAM dapat memotret kondisi awan langit.
    - Jika AI mendeteksi awan tebal mendung (*kumulonimbus/nimbostratus*), sistem memicu peringatan dini dan menutup atap jemuran secara otomatis.
@@ -112,6 +113,9 @@ c:/xampp/htdocs/SkyGuard-AI/
 | `GET` | `/api/status.php` | Mengambil status telemetri real-time, sisa timer, dan peringatan aktif. |
 | `POST` | `/api/control.php` | Mengirim perintah buka/tutup atap, switch mode (Auto/Manual/Timer), set durasi timer. |
 | `POST` | `/api/ai_analyze.php` | Menganalisis file citra/foto langit dan mengembalikan klasifikasi AI cuaca. |
+| `GET` | `/api/settings.php?action=get_settings` | Mengambil konfigurasi (provider AI, API key mask, alamat server/IP untuk ESP32). |
+| `POST` | `/api/settings.php?action=save_settings` | Menyimpan provider AI, API key (Gemini/OpenAI), model, & alamat server. |
+| `POST` | `/api/simulate.php` | Hardware Simulator: `sim_sensor`, `sim_weather`, `sim_timer`, `reset`. |
 | `GET` | `/api/esp32.php?action=get_command` | Digunakan ESP32 untuk polling posisi target servo/motor. |
 | `POST` | `/api/esp32.php?action=update_sensors` | Digunakan ESP32 untuk mengirim nilai sensor air dan cahaya. |
 | `POST` | `/api/esp32.php?action=upload_cam` | Digunakan ESP32-CAM untuk mengunggah foto langit. |

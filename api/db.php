@@ -137,7 +137,12 @@ function initializeDatabase($pdo) {
         'close_roof_hour' => '17:30',
         'auto_close_on_mendung' => '1',
         'ai_sensitivity' => '0.80',
-        'sound_alert' => '1'
+        'sound_alert' => '1',
+        'ai_provider' => 'local',
+        'gemini_api_key' => '',
+        'openai_api_key' => '',
+        'ai_model' => '',
+        'server_host' => ''
     ];
 
     foreach ($defaultSettings as $key => $val) {

@@ -250,7 +250,12 @@ void connectWiFi() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WIFI] Terhubung! IP ESP32-CAM: " + WiFi.localIP().toString());
+    Serial.println("\n[WIFI] Terhubung! IP ESP32-CAM : " + WiFi.localIP().toString()); // <-- IP di Serial Monitor
+    Serial.println("[WIFI] Server Upload Sky : " + SERVER_UPLOAD_URL);
+    Serial.println("----------------------------------------------------------");
+    Serial.println("  Pastikan IP pada SERVER_UPLOAD_URL sama dengan IP Laptop/XAMPP");
+    Serial.println("  agar foto bisa diunggah ke dashboard SkyGuard AI.");
+    Serial.println("----------------------------------------------------------");
   } else {
     Serial.println("\n[WIFI] Gagal terhubung ke Wi-Fi!");
   }

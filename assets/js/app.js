@@ -490,34 +490,58 @@ const App = {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
+                    const s = data.settings;
                     const badge = document.getElementById('geminiStatusBadge');
-                    const keyInput = document.getElementById('geminiApiKeyInput');
-                    if (data.settings.has_gemini_key) {
-                        if (badge) {
+
+                    // Badge engine
+                    if (badge) {
+                        if (s.ai_provider === 'gemini' && s.has_gemini_key) {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
-                            badge.innerHTML = '<i class="fas fa-sparkles text-emerald-400"></i> Google Gemini Vision API Aktif';
-                        }
-                        if (keyInput) keyInput.placeholder = 'API Key Tersimpan (' + data.settings.masked_gemini_key + ')';
-                    } else {
-                        if (badge) {
+                            badge.innerHTML = '<i class="fas fa-sparkles text-emerald-400"></i> Google Gemini Vision Aktif';
+                        } else if (s.ai_provider === 'openai' && s.has_openai_key) {
+                            badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
+                            badge.innerHTML = '<i class="fas fa-robot text-emerald-400"></i> OpenAI Vision Aktif';
+                        } else {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 inline-flex items-center gap-1';
-                            badge.innerHTML = '<i class="fas fa-microchip text-cyan-400"></i> AI Vision Engine Aktif';
+                            badge.innerHTML = '<i class="fas fa-microchip text-cyan-400"></i> Local AI Vision Aktif';
                         }
-                        if (keyInput) keyInput.placeholder = 'Masukkan Google AI Studio Key (Opsional)';
                     }
+
+                    const providerSel = document.getElementById('aiProviderSelect');
+                    if (providerSel) providerSel.value = s.ai_provider || 'local';
+                    const geminiInp = document.getElementById('geminiApiKeyInput');
+                    if (geminiInp) geminiInp.placeholder = s.has_gemini_key ? 'API Key Tersimpan (' + s.masked_gemini_key + ')' : 'Masukkan Google AI Studio API Key';
+                    const openaiInp = document.getElementById('openaiApiKeyInput');
+                    if (openaiInp) openaiInp.placeholder = s.has_openai_key ? 'API Key Tersimpan (' + s.masked_openai_key + ')' : 'Masukkan OpenAI API Key (sk-...)';
+                    const modelInp = document.getElementById('aiModelInput');
+                    if (modelInp) modelInp.value = s.ai_model || '';
+
+                    const hostEl = document.getElementById('serverHostDisplay');
+                    if (hostEl) hostEl.innerText = s.server_host || s.detected_host || '-';
                 }
             })
             .catch(err => console.error(err));
     },
 
     saveGeminiKey() {
-        const input = document.getElementById('geminiApiKeyInput');
-        const key = input ? input.value.trim() : '';
+        const providerSel = document.getElementById('aiProviderSelect');
+        const geminiInp = document.getElementById('geminiApiKeyInput');
+        const openaiInp = document.getElementById('openaiApiKeyInput');
+        const modelInp = document.getElementById('aiModelInput');
+        const hostEl = document.getElementById('serverHostDisplay');
 
-        fetch('api/settings.php?action=save_gemini_key', {
+        const payload = {
+            ai_provider: providerSel ? providerSel.value : 'local',
+            gemini_api_key: geminiInp ? geminiInp.value.trim() : '',
+            openai_api_key: openaiInp ? openaiInp.value.trim() : '',
+            ai_model: modelInp ? modelInp.value.trim() : '',
+            server_host: hostEl ? hostEl.innerText : ''
+        };
+
+        fetch('api/settings.php?action=save_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: key })
+            body: JSON.stringify(payload)
         })
         .then(res => res.json())
         .then(data => {
@@ -526,7 +550,7 @@ const App = {
                 this.loadSettings();
                 document.getElementById('settingsModal')?.classList.add('hidden');
             } else {
-                showToast('Gagal menyimpan API key', 'danger');
+                showToast('Gagal menyimpan pengaturan', 'danger');
             }
         })
         .catch(err => console.error(err));

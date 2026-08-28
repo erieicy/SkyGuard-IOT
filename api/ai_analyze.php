@@ -32,8 +32,14 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     $savedFilename = '';
     $uploadedFilePath = '';
 
+    // 0. Gunakan file yang SUDAH disimpan oleh esp32.php (upload_cam raw stream)
+    //    => mencegah php://input dibaca dua kali (bug raw stream).
+    if (isset($GLOBALS['skyguard_uploaded_file']) && file_exists($GLOBALS['skyguard_uploaded_file'])) {
+        $uploadedFilePath = $GLOBALS['skyguard_uploaded_file'];
+        $savedFilename = basename($uploadedFilePath);
+    }
     // 1. Direct File Upload (Multipart from ESP32-CAM or form)
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+    elseif (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['image']['tmp_name'];
         $fileName = $_FILES['image']['name'];
         $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) ?: 'jpg';
@@ -45,7 +51,7 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
             echo json_encode(['success' => false, 'error' => 'Gagal menyimpan file gambar']);
             exit;
         }
-    } 
+    }
     // 2. Base64 Image Upload (Live Camera frame or Stream)
     elseif (isset($_POST['image_base64'])) {
         $base64Data = $_POST['image_base64'];
@@ -65,7 +71,7 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
         $savedFilename = 'snap_' . date('Ymd_His') . '_' . uniqid() . '.' . $fileExtension;
         $uploadedFilePath = $uploadDir . $savedFilename;
         file_put_contents($uploadedFilePath, $decodedData);
-    } 
+    }
     // 3. Raw Body Image Stream (from ESP32-CAM HTTP POST)
     else {
         $rawStream = file_get_contents('php://input');
@@ -73,17 +79,19 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
             $savedFilename = 'esp32raw_' . date('Ymd_His') . '_' . uniqid() . '.jpg';
             $uploadedFilePath = $uploadDir . $savedFilename;
             file_put_contents($uploadedFilePath, $rawStream);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Tidak ada data gambar yang diterima']);
-            exit;
         }
     }
 
-    // Retrieve Gemini API Key from settings if available
-    $apiKey = getGeminiApiKey($pdo);
+    if (empty($uploadedFilePath) || !file_exists($uploadedFilePath)) {
+        echo json_encode(['success' => false, 'error' => 'Tidak ada data gambar yang diterima']);
+        exit;
+    }
 
-    // Perform AI Image Analysis (Gemini Vision API with Heuristic fallback)
-    $analysisResult = analyzeSkyWithAI($uploadedFilePath, $apiKey);
+    // Ambil konfigurasi AI (provider, api key, model) dari settings
+    $aiConfig = getAIConfig($pdo);
+
+    // Perform AI Image Analysis (Gemini / OpenAI Vision API dengan fallback lokal)
+    $analysisResult = analyzeSkyWithAI($uploadedFilePath, $aiConfig);
 
     // Determine verdicts
     $weatherVerdict = $analysisResult['weather'];
@@ -102,11 +110,17 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     $actionReason = $state['last_action_reason'];
 
     if ($state['control_mode'] === 'AUTO') {
-        if ($weatherVerdict === 'MENDUNG' || $weatherVerdict === 'HUJAN') {
+        if ($weatherVerdict === 'HUJAN') {
             if ($state['roof_status'] === 'OPEN') {
                 $newRoofStatus = 'CLOSED';
                 $roofAction = 'CLOSED';
-                $actionReason = "AI Vision ({$aiEngineUsed}): Terdeteksi awan {$weatherVerdict} - Atap otomatis ditutup demi melindungi jemuran.";
+                $actionReason = "AI Vision ({$aiEngineUsed}): Terdeteksi hujan aktif - Atap otomatis ditutup demi melindungi jemuran.";
+            }
+        } elseif ($weatherVerdict === 'MENDUNG' && $state['auto_close_on_mendung'] == 1) {
+            if ($state['roof_status'] === 'OPEN') {
+                $newRoofStatus = 'CLOSED';
+                $roofAction = 'CLOSED';
+                $actionReason = "AI Vision ({$aiEngineUsed}): Terdeteksi awan mendung - Atap otomatis ditutup (Auto-Close Mendung AKTIF).";
             }
         } elseif ($lightVerdict === 'SUNLIGHT' && in_array($weatherVerdict, ['CERAH', 'BERAWAN']) && $state['rain_detected'] == 0) {
             if ($state['roof_status'] === 'CLOSED') {
@@ -167,7 +181,7 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     if ($weatherVerdict === 'MENDUNG') {
         $alert = $pdo->prepare("
             INSERT INTO alerts (alert_type, title, message, severity)
-            VALUES ('MENDUNG_ALERT', 'Peringatan Awan Mendung!', 'Kamera ESP32 & AI mendeteksi awan mendung gelap. ' . ?, 'warning')
+            VALUES ('MENDUNG_ALERT', 'Peringatan Awan Mendung!', 'Kamera ESP32 & AI mendeteksi awan mendung gelap. ' || ?, 'warning')
         ");
         $alert->execute([$state['control_mode'] === 'AUTO' ? 'Atap jemuran ditutup otomatis.' : 'Harap segera tutup jemuran secara manual!']);
     } elseif ($weatherVerdict === 'HUJAN') {
@@ -203,52 +217,53 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
 }
 
 /**
- * Retrieve Gemini API Key from settings table
+ * Ambil konfigurasi AI dari settings: provider, gemini key, openai key, model
  */
-function getGeminiApiKey($pdo) {
+function getAIConfig($pdo) {
     try {
-        $stmt = $pdo->query("SELECT value FROM settings WHERE key = 'gemini_api_key'");
-        $val = $stmt->fetchColumn();
-        return !empty($val) ? trim($val) : null;
+        $rows = $pdo->query("SELECT key, value FROM settings WHERE key IN ('ai_provider','gemini_api_key','openai_api_key','ai_model')")->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (Exception $e) {
-        return null;
+        $rows = [];
     }
+    return [
+        'provider'    => strtolower($rows['ai_provider'] ?? 'local'),
+        'gemini_key'  => !empty($rows['gemini_api_key']) ? trim($rows['gemini_api_key']) : null,
+        'openai_key'  => !empty($rows['openai_api_key']) ? trim($rows['openai_api_key']) : null,
+        'model'       => !empty($rows['ai_model']) ? trim($rows['ai_model']) : ''
+    ];
 }
 
 /**
- * Main AI Analyzer: Uses Google Gemini Vision API if key exists, otherwise Local Spectrum CV
+ * Main AI Analyzer: dispatch ke provider (Gemini / OpenAI) dengan fallback lokal
  */
-function analyzeSkyWithAI($filePath, $apiKey = null) {
-    // 1. If Gemini API Key is available, invoke Google Gemini Vision API
-    if (!empty($apiKey)) {
-        $geminiResult = callGeminiVisionAPI($filePath, $apiKey);
-        if ($geminiResult !== null) {
-            $geminiResult['engine'] = 'Google Gemini Vision AI';
-            return $geminiResult;
+function analyzeSkyWithAI($filePath, $aiConfig = []) {
+    // 1. Google Gemini Vision API
+    if (($aiConfig['provider'] ?? 'local') === 'gemini' && !empty($aiConfig['gemini_key'])) {
+        $res = callGeminiVisionAPI($filePath, $aiConfig['gemini_key'], $aiConfig['model'] ?: 'gemini-1.5-flash');
+        if ($res !== null) {
+            $res['engine'] = 'Google Gemini Vision AI';
+            return $res;
         }
     }
-
-    // 2. Fallback to Local Computer Vision Image Analysis
+    // 2. OpenAI Vision API
+    if (($aiConfig['provider'] ?? 'local') === 'openai' && !empty($aiConfig['openai_key'])) {
+        $res = callOpenAIVisionAPI($filePath, $aiConfig['openai_key'], $aiConfig['model'] ?: 'gpt-4o-mini');
+        if ($res !== null) {
+            $res['engine'] = 'OpenAI Vision API';
+            return $res;
+        }
+    }
+    // 3. Fallback Local Computer Vision Image Analysis
     $localResult = analyzeSkyImageLocal($filePath);
     $localResult['engine'] = 'Local AI Vision Engine';
     return $localResult;
 }
 
 /**
- * Google Gemini Vision API Caller
+ * Prompt standar untuk analisis citra langit (dipakai Gemini & OpenAI)
  */
-function callGeminiVisionAPI($filePath, $apiKey) {
-    if (!file_exists($filePath)) return null;
-
-    $imageData = file_get_contents($filePath);
-    $base64Image = base64_encode($imageData);
-    $mimeType = 'image/jpeg';
-    $imgInfo = @getimagesize($filePath);
-    if ($imgInfo && isset($imgInfo['mime'])) {
-        $mimeType = $imgInfo['mime'];
-    }
-
-    $promptText = "You are SkyGuard AI, an expert computer vision model for an automated IoT clothesline.
+function skyGuardVisionPrompt() {
+    return "You are SkyGuard AI, an expert computer vision model for an automated IoT clothesline.
 Analyze this photo taken by the ESP32-CAM module facing upwards/outdoors.
 Task:
 1. Identify if the light source is Natural Daylight/Sunlight ('SUNLIGHT'), Artificial Indoor Room Lamp/Bulb ('ARTIFICIAL_LAMP'), or Night/Dark ('DARK').
@@ -267,6 +282,23 @@ Respond ONLY with a valid JSON object matching this exact schema:
   \"recommendation\": \"Sinar matahari cerah optimal. Rekomendasi jemur: 45 menit.\",
   \"details\": \"Analisis spektrum cahaya alami menunjukkan langit cerah dengan luminansi matahari tinggi.\"
 }";
+}
+
+/**
+ * Google Gemini Vision API Caller
+ */
+function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini-1.5-flash') {
+    if (!file_exists($filePath)) return null;
+
+    $imageData = file_get_contents($filePath);
+    $base64Image = base64_encode($imageData);
+    $mimeType = 'image/jpeg';
+    $imgInfo = @getimagesize($filePath);
+    if ($imgInfo && isset($imgInfo['mime'])) {
+        $mimeType = $imgInfo['mime'];
+    }
+
+    $promptText = skyGuardVisionPrompt();
 
     $payload = [
         'contents' => [
@@ -288,7 +320,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
         ]
     ];
 
-    $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . urlencode($apiKey);
+    $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($apiKey);
 
     $ch = curl_init($apiUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -315,6 +347,80 @@ Respond ONLY with a valid JSON object matching this exact schema:
                     'recommended_minutes' => (int)($parsed['recommended_minutes'] ?? 45),
                     'recommendation' => $parsed['recommendation'] ?? 'Pencahayaan teranalisis oleh Gemini AI.',
                     'details' => $parsed['details'] ?? 'Hasil klasifikasi Google Gemini Vision API.'
+                ];
+            }
+        }
+    }
+
+    return null; // Fallback to local CV
+}
+
+/**
+ * OpenAI Vision API Caller (Chat Completions dengan image_url)
+ */
+function callOpenAIVisionAPI($filePath, $apiKey, $model = 'gpt-4o-mini') {
+    if (!file_exists($filePath)) return null;
+
+    $imageData = file_get_contents($filePath);
+    $base64Image = base64_encode($imageData);
+    $mimeType = 'image/jpeg';
+    $imgInfo = @getimagesize($filePath);
+    if ($imgInfo && isset($imgInfo['mime'])) {
+        $mimeType = $imgInfo['mime'];
+    }
+
+    $dataUri = 'data:' . $mimeType . ';base64,' . $base64Image;
+    $promptText = skyGuardVisionPrompt();
+
+    $payload = [
+        'model' => $model,
+        'messages' => [
+            [
+                'role' => 'system',
+                'content' => 'You are SkyGuard AI, a computer vision assistant for an IoT clothesline. Reply ONLY with JSON.'
+            ],
+            [
+                'role' => 'user',
+                'content' => [
+                    ['type' => 'text', 'text' => $promptText],
+                    ['type' => 'image_url', 'image_url' => ['url' => $dataUri]]
+                ]
+            ]
+        ],
+        'response_format' => ['type' => 'json_object'],
+        'temperature' => 0.2
+    ];
+
+    $apiUrl = 'https://api.openai.com/v1/chat/completions';
+
+    $ch = curl_init($apiUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $apiKey
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode === 200 && !empty($response)) {
+        $resJson = json_decode($response, true);
+        if (isset($resJson['choices'][0]['message']['content'])) {
+            $aiText = trim($resJson['choices'][0]['message']['content']);
+            $parsed = json_decode($aiText, true);
+            if ($parsed && isset($parsed['weather']) && isset($parsed['light_verdict'])) {
+                return [
+                    'weather' => strtoupper($parsed['weather']),
+                    'light_verdict' => strtoupper($parsed['light_verdict']),
+                    'confidence' => (float)($parsed['confidence'] ?? 95.0),
+                    'recommended_minutes' => (int)($parsed['recommended_minutes'] ?? 45),
+                    'recommendation' => $parsed['recommendation'] ?? 'Pencahayaan teranalisis oleh OpenAI Vision.',
+                    'details' => $parsed['details'] ?? 'Hasil klasifikasi OpenAI Vision API.'
                 ];
             }
         }

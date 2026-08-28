@@ -85,10 +85,11 @@ $alertsStmt = $pdo->query("SELECT * FROM alerts ORDER BY id DESC LIMIT 10");
 $alerts = $alertsStmt->fetchAll();
 
 // Check ESP online status (active if seen in last 30 seconds)
+// Gunakan timezone UTC konsisten dengan penyimpanan esp32_last_seen (datetime('now') -> UTC)
 $espOnline = false;
 if (!empty($state['esp32_last_seen'])) {
-    $lastSeen = new DateTime($state['esp32_last_seen']);
-    $now = new DateTime('now');
+    $lastSeen = new DateTime($state['esp32_last_seen'], new DateTimeZone('UTC'));
+    $now = new DateTime('now', new DateTimeZone('UTC'));
     $diffSec = $now->getTimestamp() - $lastSeen->getTimestamp();
     $espOnline = ($diffSec <= 45);
 }

@@ -269,8 +269,14 @@ void connectToWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[WIFI] Terhubung Berhasil!");
-    Serial.print("[WIFI] IP Address ESP32: ");
-    Serial.println(WiFi.localIP());
+    Serial.print("[WIFI] IP Address ESP32 : ");
+    Serial.println(WiFi.localIP());          // <-- IP ini yg muncul di Serial Monitor
+    Serial.print("[WIFI] Server SkyGuard  : ");
+    Serial.println(SERVER_URL);              // <-- URL XAMPP yg harus dituju ESP32
+    Serial.println("----------------------------------------------------------");
+    Serial.println("  Buka Serial Monitor untuk melihat IP di atas.");
+    Serial.println("  Pastikan SERVER_URL di bawah sudah sama dengan IP Laptop/XAMPP.");
+    Serial.println("----------------------------------------------------------");
   } else {
     Serial.println("\n[WIFI] Gagal terhubung ke Wi-Fi. Akan mencoba lagi...");
   }
