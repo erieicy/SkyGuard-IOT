@@ -8,187 +8,191 @@
  * 4. Automatically secures roof if cloudy (mendung) or rainy in AUTO mode.
  */
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
 require_once __DIR__ . '/db.php';
-$pdo = getDbConnection();
 
-$uploadDir = __DIR__ . '/../uploads/';
-if (!file_exists($uploadDir)) {
-    mkdir($uploadDir, 0777, true);
-}
+// If executed via HTTP request
+if (isset($_SERVER['REQUEST_METHOD'])) {
+    header('Content-Type: application/json');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
 
-$source = $_POST['source'] ?? 'user_upload'; // esp32_cam, user_upload, simulation
-$presetType = $_POST['preset'] ?? null; // For simulation testing (sunlight, lamp, mendung, cerah, hujan)
-$savedFilename = '';
-$uploadedFilePath = '';
-
-// Check if direct file upload
-if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-    $fileTmpPath = $_FILES['image']['tmp_name'];
-    $fileName = $_FILES['image']['name'];
-    $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-    
-    // Generate unique name
-    $savedFilename = 'sky_' . date('Ymd_His') . '_' . uniqid() . '.' . ($fileExtension ?: 'jpg');
-    $uploadedFilePath = $uploadDir . $savedFilename;
-    
-    if (!move_uploaded_file($fileTmpPath, $uploadedFilePath)) {
-        echo json_encode(['success' => false, 'error' => 'Gagal menyimpan file gambar']);
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
         exit;
     }
-} elseif (isset($_POST['image_base64'])) {
-    // Base64 upload
-    $base64Data = $_POST['image_base64'];
-    if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
-        $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
-        $fileExtension = strtolower($type[1]);
+
+    $pdo = getDbConnection();
+    $uploadDir = __DIR__ . '/../uploads/';
+    if (!file_exists($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
+
+    $source = $_POST['source'] ?? 'user_upload'; // esp32_cam, user_upload, simulation
+    $presetType = $_POST['preset'] ?? null; // For simulation testing (sunlight, lamp, mendung, cerah, hujan)
+    $savedFilename = '';
+    $uploadedFilePath = '';
+
+    // Check if direct file upload
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['image']['tmp_name'];
+        $fileName = $_FILES['image']['name'];
+        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        
+        // Generate unique name
+        $savedFilename = 'sky_' . date('Ymd_His') . '_' . uniqid() . '.' . ($fileExtension ?: 'jpg');
+        $uploadedFilePath = $uploadDir . $savedFilename;
+        
+        if (!move_uploaded_file($fileTmpPath, $uploadedFilePath)) {
+            echo json_encode(['success' => false, 'error' => 'Gagal menyimpan file gambar']);
+            exit;
+        }
+    } elseif (isset($_POST['image_base64'])) {
+        // Base64 upload
+        $base64Data = $_POST['image_base64'];
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+            $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $fileExtension = strtolower($type[1]);
+        } else {
+            $fileExtension = 'jpg';
+        }
+        
+        $decodedData = base64_decode($base64Data);
+        if ($decodedData === false) {
+            echo json_encode(['success' => false, 'error' => 'Format Base64 gambar tidak valid']);
+            exit;
+        }
+        
+        $savedFilename = 'sky_' . date('Ymd_His') . '_' . uniqid() . '.' . $fileExtension;
+        $uploadedFilePath = $uploadDir . $savedFilename;
+        file_put_contents($uploadedFilePath, $decodedData);
+    } elseif (!empty($presetType)) {
+        // Simulation with preset
+        $savedFilename = 'sim_' . $presetType . '_' . date('Ymd_His') . '.jpg';
+        $uploadedFilePath = $uploadDir . $savedFilename;
+        createPresetImage($presetType, $uploadedFilePath);
     } else {
-        $fileExtension = 'jpg';
-    }
-    
-    $decodedData = base64_decode($base64Data);
-    if ($decodedData === false) {
-        echo json_encode(['success' => false, 'error' => 'Format Base64 gambar tidak valid']);
+        echo json_encode(['success' => false, 'error' => 'Tidak ada gambar yang diunggah']);
         exit;
     }
-    
-    $savedFilename = 'sky_' . date('Ymd_His') . '_' . uniqid() . '.' . $fileExtension;
-    $uploadedFilePath = $uploadDir . $savedFilename;
-    file_put_contents($uploadedFilePath, $decodedData);
-} elseif (!empty($presetType)) {
-    // Simulation with preset
-    $savedFilename = 'sim_' . $presetType . '_' . date('Ymd_His') . '.jpg';
-    $uploadedFilePath = $uploadDir . $savedFilename;
-    createPresetImage($presetType, $uploadedFilePath);
-} else {
-    echo json_encode(['success' => false, 'error' => 'Tidak ada gambar yang diunggah']);
+
+    // Perform AI Image Analysis
+    $analysisResult = analyzeSkyImage($uploadedFilePath, $presetType);
+
+    // Determine action and recommendation
+    $weatherVerdict = $analysisResult['weather'];
+    $lightVerdict = $analysisResult['light_verdict'];
+    $confidence = $analysisResult['confidence'];
+    $dryingMinutes = $analysisResult['recommended_minutes'];
+    $recommendation = $analysisResult['recommendation'];
+
+    // Fetch current device state
+    $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
+    $state = $stmt->fetch();
+
+    $roofAction = 'NO_CHANGE';
+    $newRoofStatus = $state['roof_status'];
+    $actionReason = $state['last_action_reason'];
+
+    if ($state['control_mode'] === 'AUTO') {
+        if ($weatherVerdict === 'MENDUNG' || $weatherVerdict === 'HUJAN') {
+            if ($state['roof_status'] === 'OPEN') {
+                $newRoofStatus = 'CLOSED';
+                $roofAction = 'CLOSED';
+                $actionReason = 'AI Vision: Terdeteksi awan ' . $weatherVerdict . ' - Atap otomatis ditutup demi melindungi jemuran.';
+            }
+        } elseif ($lightVerdict === 'SUNLIGHT' && in_array($weatherVerdict, ['CERAH', 'BERAWAN']) && $state['rain_detected'] == 0) {
+            if ($state['roof_status'] === 'CLOSED') {
+                $newRoofStatus = 'OPEN';
+                $roofAction = 'OPENED';
+                $actionReason = 'AI Vision: Terdeteksi sinar matahari cerah - Atap otomatis dibuka untuk menjemur pakaian.';
+            }
+        } elseif ($lightVerdict === 'ARTIFICIAL_LAMP') {
+            if ($state['roof_status'] === 'OPEN') {
+                $newRoofStatus = 'CLOSED';
+                $roofAction = 'CLOSED';
+                $actionReason = 'AI Vision: Terdeteksi hanya lampu ruangan (bukan matahari) - Atap diamankan ditutup.';
+            }
+        }
+    }
+
+    // Update device state
+    $update = $pdo->prepare("
+        UPDATE device_state 
+        SET roof_status = ?,
+            ai_light_verdict = ?,
+            ai_weather_verdict = ?,
+            ai_confidence = ?,
+            ai_drying_recommendation = ?,
+            recommended_minutes = ?,
+            last_action_reason = ?,
+            esp32_cam_last_seen = datetime('now', 'localtime'),
+            updated_at = datetime('now', 'localtime')
+        WHERE id = 1
+    ");
+    $update->execute([
+        $newRoofStatus,
+        $lightVerdict,
+        $weatherVerdict,
+        $confidence,
+        $recommendation,
+        $dryingMinutes,
+        $actionReason
+    ]);
+
+    // Insert camera history record
+    $hist = $pdo->prepare("
+        INSERT INTO camera_history (image_path, source, ai_classification, ai_confidence, light_detected, roof_action, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ");
+    $relativePath = 'uploads/' . $savedFilename;
+    $hist->execute([
+        $relativePath,
+        $source,
+        $weatherVerdict . ' (' . $lightVerdict . ')',
+        $confidence,
+        ($lightVerdict === 'SUNLIGHT' || $lightVerdict === 'ARTIFICIAL_LAMP') ? 1 : 0,
+        $roofAction,
+        $recommendation
+    ]);
+
+    // Create alert if Mendung / Hujan / Lamp
+    if ($weatherVerdict === 'MENDUNG') {
+        $alert = $pdo->prepare("
+            INSERT INTO alerts (alert_type, title, message, severity)
+            VALUES ('MENDUNG_ALERT', 'Peringatan Cuaca Mendung!', 'Kamera AI mendeteksi awan mendung gelap. ' . ?, 'warning')
+        ");
+        $alert->execute([$state['control_mode'] === 'AUTO' ? 'Atap jemuran ditutup otomatis.' : 'Harap segera tutup jemuran secara manual!']);
+    } elseif ($weatherVerdict === 'HUJAN') {
+        $alert = $pdo->prepare("
+            INSERT INTO alerts (alert_type, title, message, severity)
+            VALUES ('RAIN_DETECTED', 'Peringatan Hujan!', 'Kamera AI dan sensor mengonfirmasi cuaca hujan. Atap diamankan tertutup.', 'danger')
+        ");
+        $alert->execute();
+    } elseif ($lightVerdict === 'ARTIFICIAL_LAMP') {
+        $alert = $pdo->prepare("
+            INSERT INTO alerts (alert_type, title, message, severity)
+            VALUES ('LAMP_DETECTED', 'Deteksi Lampu Ruangan', 'Sensor mendeteksi cahaya, namun kamera AI mengonfirmasi ini adalah cahaya lampu listrik/ruangan, bukan sinar matahari.', 'info')
+        ");
+        $alert->execute();
+    }
+
+    echo json_encode([
+        'success' => true,
+        'image_url' => $relativePath,
+        'analysis' => [
+            'weather' => $weatherVerdict,
+            'light_verdict' => $lightVerdict,
+            'confidence' => $confidence,
+            'details' => $analysisResult['details'],
+            'recommendation' => $recommendation,
+            'recommended_minutes' => $dryingMinutes,
+            'roof_action' => $roofAction,
+            'new_roof_status' => $newRoofStatus
+        ]
+    ]);
     exit;
 }
-
-// Perform AI Image Analysis
-$analysisResult = analyzeSkyImage($uploadedFilePath, $presetType);
-
-// Determine action and recommendation
-$weatherVerdict = $analysisResult['weather'];
-$lightVerdict = $analysisResult['light_verdict'];
-$confidence = $analysisResult['confidence'];
-$dryingMinutes = $analysisResult['recommended_minutes'];
-$recommendation = $analysisResult['recommendation'];
-
-// Fetch current device state
-$stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
-$state = $stmt->fetch();
-
-$roofAction = 'NO_CHANGE';
-$newRoofStatus = $state['roof_status'];
-$actionReason = $state['last_action_reason'];
-
-if ($state['control_mode'] === 'AUTO') {
-    if ($weatherVerdict === 'MENDUNG' || $weatherVerdict === 'HUJAN') {
-        if ($state['roof_status'] === 'OPEN') {
-            $newRoofStatus = 'CLOSED';
-            $roofAction = 'CLOSED';
-            $actionReason = 'AI Vision: Terdeteksi awan ' . $weatherVerdict . ' - Atap otomatis ditutup demi melindungi jemuran.';
-        }
-    } elseif ($lightVerdict === 'SUNLIGHT' && in_array($weatherVerdict, ['CERAH', 'BERAWAN']) && $state['rain_detected'] == 0) {
-        if ($state['roof_status'] === 'CLOSED') {
-            $newRoofStatus = 'OPEN';
-            $roofAction = 'OPENED';
-            $actionReason = 'AI Vision: Terdeteksi sinar matahari cerah - Atap otomatis dibuka untuk menjemur pakaian.';
-        }
-    } elseif ($lightVerdict === 'ARTIFICIAL_LAMP') {
-        if ($state['roof_status'] === 'OPEN') {
-            $newRoofStatus = 'CLOSED';
-            $roofAction = 'CLOSED';
-            $actionReason = 'AI Vision: Terdeteksi hanya lampu ruangan (bukan matahari) - Atap diamankan ditutup.';
-        }
-    }
-}
-
-// Update device state
-$update = $pdo->prepare("
-    UPDATE device_state 
-    SET roof_status = ?,
-        ai_light_verdict = ?,
-        ai_weather_verdict = ?,
-        ai_confidence = ?,
-        ai_drying_recommendation = ?,
-        recommended_minutes = ?,
-        last_action_reason = ?,
-        esp32_cam_last_seen = datetime('now', 'localtime'),
-        updated_at = datetime('now', 'localtime')
-    WHERE id = 1
-");
-$update->execute([
-    $newRoofStatus,
-    $lightVerdict,
-    $weatherVerdict,
-    $confidence,
-    $recommendation,
-    $dryingMinutes,
-    $actionReason
-]);
-
-// Insert camera history record
-$hist = $pdo->prepare("
-    INSERT INTO camera_history (image_path, source, ai_classification, ai_confidence, light_detected, roof_action, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-");
-$relativePath = 'uploads/' . $savedFilename;
-$hist->execute([
-    $relativePath,
-    $source,
-    $weatherVerdict . ' (' . $lightVerdict . ')',
-    $confidence,
-    ($lightVerdict === 'SUNLIGHT' || $lightVerdict === 'ARTIFICIAL_LAMP') ? 1 : 0,
-    $roofAction,
-    $recommendation
-]);
-
-// Create alert if Mendung / Hujan / Lamp
-if ($weatherVerdict === 'MENDUNG') {
-    $alert = $pdo->prepare("
-        INSERT INTO alerts (alert_type, title, message, severity)
-        VALUES ('MENDUNG_ALERT', 'Peringatan Cuaca Mendung!', 'Kamera AI mendeteksi awan mendung gelap. ' . ?, 'warning')
-    ");
-    $alert->execute([$state['control_mode'] === 'AUTO' ? 'Atap jemuran ditutup otomatis.' : 'Harap segera tutup jemuran secara manual!']);
-} elseif ($weatherVerdict === 'HUJAN') {
-    $alert = $pdo->prepare("
-        INSERT INTO alerts (alert_type, title, message, severity)
-        VALUES ('RAIN_DETECTED', 'Peringatan Hujan!', 'Kamera AI dan sensor mengonfirmasi cuaca hujan. Atap diamankan tertutup.', 'danger')
-    ");
-    $alert->execute();
-} elseif ($lightVerdict === 'ARTIFICIAL_LAMP') {
-    $alert = $pdo->prepare("
-        INSERT INTO alerts (alert_type, title, message, severity)
-        VALUES ('LAMP_DETECTED', 'Deteksi Lampu Ruangan', 'Sensor mendeteksi cahaya, namun kamera AI mengonfirmasi ini adalah cahaya lampu listrik/ruangan, bukan sinar matahari.', 'info')
-    ");
-    $alert->execute();
-}
-
-echo json_encode([
-    'success' => true,
-    'image_url' => $relativePath,
-    'analysis' => [
-        'weather' => $weatherVerdict,
-        'light_verdict' => $lightVerdict,
-        'confidence' => $confidence,
-        'details' => $analysisResult['details'],
-        'recommendation' => $recommendation,
-        'recommended_minutes' => $dryingMinutes,
-        'roof_action' => $roofAction,
-        'new_roof_status' => $newRoofStatus
-    ]
-]);
 
 /**
  * Image Analysis Algorithm (RGB balance, Luminance, Color Saturation & Texture)
@@ -281,12 +285,6 @@ function analyzeSkyImage($filePath, $forcedPreset = null) {
                 $avgB = $totalB / max(1, $sampleCount);
                 $brightness = (0.299 * $avgR + 0.587 * $avgG + 0.114 * $avgB);
 
-                // Analyze characteristics:
-                // 1. Lamp check: High warm yellow/orange concentration in non-sky setting or intense point light
-                // 2. Clear Sky: Strong Blue component ($avgB > $avgR) with high brightness
-                // 3. Mendung (Cloudy): Grayish ($avgR approx equal $avgG and $avgB) with medium/low brightness
-                // 4. Night: Very low brightness
-                
                 if ($brightness < 40) {
                     return [
                         'weather' => 'MALAM',
