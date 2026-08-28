@@ -99,7 +99,7 @@ function initializeDatabase($pdo) {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             image_path TEXT NOT NULL,
-            source TEXT DEFAULT 'esp32_cam', -- esp32_cam, user_upload, simulation
+            source TEXT DEFAULT 'esp32_cam', -- esp32_cam, direct_camera, user_upload
             ai_classification TEXT NOT NULL, -- SUNLIGHT, LAMP_INDOOR, CERAH, MENDUNG, HUJAN, MALAM
             ai_confidence REAL DEFAULT 0.0,
             light_detected INTEGER DEFAULT 1,

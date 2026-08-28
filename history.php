@@ -131,7 +131,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                 <div class="text-center py-12 text-slate-500">
                     <i class="fas fa-image text-4xl mb-3 opacity-40"></i>
                     <p class="text-sm">Belum ada foto cuaca yang tersimpan.</p>
-                    <p class="text-xs text-slate-600 mt-1">Gunakan tombol upload di dashboard atau simulator untuk menambahkan foto.</p>
+                    <p class="text-xs text-slate-600 mt-1">Foto akan muncul otomatis saat ESP32-CAM mengirimkan tangkapan cuaca.</p>
                 </div>
             <?php else: ?>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">

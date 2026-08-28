@@ -2,7 +2,7 @@
 /**
  * SkyGuard AI - Real-time Status API
  * GET: Retrieves latest device state, sensor telemetry, active alerts, and timer countdown
- * POST: Updates telemetry from simulator or web hooks
+ * POST: Updates telemetry from ESP32 sensors or web hooks
  */
 
 header('Content-Type: application/json');
