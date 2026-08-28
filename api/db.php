@@ -70,10 +70,10 @@ function initializeDatabase($pdo) {
                 ai_drying_recommendation, recommended_minutes, auto_close_on_mendung,
                 last_action_reason, updated_at
             ) VALUES (
-                1, 'CLOSED', 'AUTO', 0, 85,
-                'SUNLIGHT', 'CERAH', 95.5,
-                'Cahaya matahari terik optimal. Rekomendasi jemur: 45 - 60 menit.', 45, 1,
-                'Sistem pertama kali diinisialisasi', datetime('now', 'localtime')
+                1, 'CLOSED', 'AUTO', 0, 0,
+                'UNKNOWN', 'MENUNGGU DATA', 0.0,
+                'Menunggu data sensor & tangkapan kamera langsung dari ESP32...', 0, 1,
+                'Sistem siap menerima data percobaan ESP32', datetime('now', 'localtime')
             )
         ");
     }
