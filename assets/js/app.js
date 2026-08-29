@@ -209,6 +209,9 @@ const App = {
         // 7. Stopwatch & Timer Countdown Logic
         this.updateTimerDisplay(s);
 
+        // 7b. Kunci fitur yang butuh ESP32 saat terputus (seperti Stopwatch)
+        this._updateAiActionLock(s.esp32_online === true);
+
         // 8. Latest Camera Photo
         if (data.latest_photo && data.latest_photo.image_path) {
             const photoEl = document.getElementById('latestCameraImage');
@@ -357,6 +360,18 @@ const App = {
         if (hint) hint.style.display = locked ? 'block' : 'none';
     },
 
+    _updateAiActionLock(online) {
+        const locked = !online;
+        const btn = document.getElementById('btnApplyAiRoof');
+        if (btn) {
+            btn.disabled = locked;
+            btn.classList.toggle('opacity-50', locked);
+            btn.classList.toggle('pointer-events-none', locked);
+        }
+        const hint = document.getElementById('aiOfflineHint');
+        if (hint) hint.style.display = locked ? 'block' : 'none';
+    },
+
     _renderTimerDigits(sec, digitsEl) {
         const el = digitsEl || document.getElementById('timerDigitsDisplay');
         if (!el) return;
@@ -476,6 +491,10 @@ const App = {
         const s = appState;
         if (!s) {
             showToast('Belum ada data analisis AI.', 'info');
+            return;
+        }
+        if (s.esp32_online !== true) {
+            showToast('Hubungkan ESP32 terlebih dahulu untuk menerapkan saran AI.', 'info');
             return;
         }
         const rec = s.ai_roof_recommendation || 'NO_CHANGE';

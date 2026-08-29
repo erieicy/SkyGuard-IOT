@@ -297,6 +297,7 @@
                 <button onclick="App.applyAiRecommendation()" id="btnApplyAiRoof" title="Terapkan saran AI untuk membuka/menutup atap" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-cyan-600/90 hover:bg-cyan-500 text-white text-[11px] font-semibold shadow transition-all flex items-center justify-center gap-1.5">
                     <i class="fas fa-robot"></i> Terapkan Saran AI (Buka/Tutup Atap)
                 </button>
+                <p id="aiOfflineHint" style="display: none;" class="text-[10px] text-rose-300 mt-2 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk menerapkan saran AI.</p>
             </div>
 
             <!-- Card 4: Stopwatch Timer Quick Widget -->
@@ -565,6 +566,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js?v=20260830t3"></script>
+    <script src="assets/js/app.js?v=20260830t4"></script>
 </body>
 </html>
