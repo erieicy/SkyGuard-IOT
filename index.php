@@ -66,15 +66,15 @@
 
         <!-- Right System Status -->
         <div class="flex items-center gap-3">
-            <button onclick="Simulator.open()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white border border-violet-400/40 shadow flex items-center gap-2 transition-all">
-                <i class="fas fa-flask text-white"></i> <span class="hidden sm:inline">Hardware Simulator</span>
-            </button>
             <button onclick="document.getElementById('settingsModal').classList.toggle('hidden')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-cyan-500/40 shadow flex items-center gap-2 transition-all">
                 <i class="fas fa-gear text-cyan-400"></i> <span class="hidden sm:inline">Pengaturan</span> AI
             </button>
-            <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800">
-                <span id="espStatusDot" class="pulse-dot offline"></span>
-                <span id="espStatusText" class="text-xs font-semibold text-rose-400">ESP32 STANDBY</span>
+            <div class="flex items-center gap-2">
+                <input id="espIpInput" type="text" placeholder="IP ESP32 (WiFi)" class="w-36 sm:w-44 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500" />
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all" onclick="App.fetchStatus()">
+                    <span id="espStatusDot" class="pulse-dot offline"></span>
+                    <span id="espStatusText" class="text-xs font-semibold text-rose-400">ESP32 STANDBY</span>
+                </div>
             </div>
         </div>
     </nav>
@@ -528,30 +528,13 @@
 
             <div class="space-y-4 text-xs">
                 <div>
-                    <label class="font-bold text-slate-200 block mb-1.5">Provider AI Vision:</label>
-                    <select id="aiProviderSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-                        <option value="local">Local AI Vision Engine (Tanpa API Key)</option>
-                        <option value="gemini">Google Gemini Vision API</option>
-                        <option value="openai">OpenAI Vision API</option>
-                    </select>
+                    <label class="font-bold text-slate-200 block mb-1.5">API Key AI Vision (Satu Kunci Untuk Semua):</label>
+                    <input type="password" id="aiApiKeyInput" placeholder="Tempel API Key Gemini / OpenAI..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
                     <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                        Pilih mesin analisis citra. <strong>Local</strong> bekerja offline (tanpa key). <strong>Gemini</strong> / <strong>OpenAI</strong> butuh API key.
+                        Cukup satu key. Sistem otomatis mendeteksi provider-nya:
+                        key diawali <code>sk-</code> &rarr; <strong>OpenAI</strong>, selain itu &rarr; <strong>Google Gemini</strong>.
+                        Biarkan kosong untuk menggunakan <strong>Local AI Vision</strong> (offline, tanpa API).
                     </p>
-                </div>
-
-                <div>
-                    <label class="font-bold text-slate-200 block mb-1.5">Google Gemini API Key:</label>
-                    <input type="password" id="geminiApiKeyInput" placeholder="Masukkan Google AI Studio API Key..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-
-                <div>
-                    <label class="font-bold text-slate-200 block mb-1.5">OpenAI API Key:</label>
-                    <input type="password" id="openaiApiKeyInput" placeholder="Masukkan OpenAI API Key (sk-...)" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-
-                <div>
-                    <label class="font-bold text-slate-200 block mb-1.5">Model (Opsional):</label>
-                    <input type="text" id="aiModelInput" placeholder="Gemini: gemini-1.5-flash | OpenAI: gpt-4o-mini" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
                 </div>
 
                 <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800">
@@ -559,7 +542,7 @@
                     <p class="text-[10px] text-slate-400 mb-1">Isi IP/host ini ke variabel <code>SERVER_URL</code> / <code>SERVER_UPLOAD_URL</code> di kode firmware agar ESP32 bisa terhubung.</p>
                     <div class="flex items-center gap-2">
                         <code id="serverHostDisplay" class="text-[11px] text-cyan-300 break-all flex-1">-</code>
-                        <button onclick="Simulator.renderServerHost()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] border border-slate-700">Refresh</button>
+                        <button onclick="App.loadSettings()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] border border-slate-700">Refresh</button>
                     </div>
                 </div>
             </div>
@@ -600,72 +583,8 @@
         <span id="liveToastMsg" class="text-xs font-semibold">Notifikasi</span>
     </div>
 
-    <!-- Hardware Simulator Modal -->
-    <div id="simulatorModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="glass-panel w-full max-w-md p-6 bg-slate-900/95 border-violet-500/40 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
-                        <i class="fas fa-flask"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-100">Hardware Simulator</h3>
-                        <p class="text-[11px] text-slate-400">Uji sistem tanpa ESP32 terpasang</p>
-                    </div>
-                </div>
-                <button onclick="Simulator.close()" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
-            </div>
-
-            <!-- Sensor Hujan & Cahaya -->
-            <div class="space-y-4 text-xs">
-                <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="font-bold text-slate-200"><i class="fas fa-droplet text-cyan-400 mr-1.5"></i> Simulasi Hujan</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="simRainChk" class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
-                        </label>
-                    </div>
-                    <label class="font-bold text-slate-300 block mb-1">Intensitas Cahaya: <span id="simLightVal">0%</span></label>
-                    <input type="range" id="simLightSlider" min="0" max="100" value="0" class="w-full accent-amber-400">
-                </div>
-
-                <!-- Preset Cuaca AI -->
-                <div>
-                    <p class="font-bold text-slate-200 mb-2"><i class="fas fa-wand-magic-sparkles text-blue-400 mr-1.5"></i> Preset Cuaca AI</p>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="Simulator.weather('CERAH')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-amber-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Cerah</button>
-                        <button onclick="Simulator.weather('BERAWAN')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-sky-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Berawan</button>
-                        <button onclick="Simulator.weather('MENDUNG')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Mendung</button>
-                        <button onclick="Simulator.weather('HUJAN')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-rose-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Hujan</button>
-                        <button onclick="Simulator.weather('MALAM')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-indigo-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Malam</button>
-                        <button onclick="Simulator.weather('LAMP')" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-orange-600/40 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">Lampu</button>
-                    </div>
-                </div>
-
-                <!-- Timer -->
-                <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                    <input id="simTimerInput" type="number" min="1" max="720" value="45" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-violet-500">
-                    <button onclick="Simulator.timer()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow transition-all">Timer</button>
-                </div>
-
-                <!-- Reset & Server Info -->
-                <div class="flex items-center justify-between gap-2 pt-1">
-                    <button onclick="Simulator.reset()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition-all">
-                        <i class="fas fa-rotate-left mr-1"></i> Reset
-                    </button>
-                    <code id="simServerHost" class="text-[10px] text-cyan-300/80 truncate">-</code>
-                </div>
-                <p class="text-[10px] text-slate-500">Endpoint ESP32: <code id="simServerHostApi">-</code></p>
-            </div>
-        </div>
-    </div>
-
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
     <script src="assets/js/app.js"></script>
-    <script src="assets/js/simulator.js"></script>
 </body>
 </html>

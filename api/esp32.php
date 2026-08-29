@@ -22,7 +22,9 @@ $action = $_GET['action'] ?? $_POST['action'] ?? 'get_command';
 // 1. ESP32 Polling & Command Retrieval
 if ($action === 'get_command' || ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
     // Update heartbeat (UTC agar konsisten dengan pengecekan status.php)
-    $pdo->exec("UPDATE device_state SET esp32_last_seen = datetime('now') WHERE id = 1");
+    $espIp = $_SERVER['REMOTE_ADDR'] ?? null;
+    $pdo->prepare("UPDATE device_state SET esp32_last_seen = datetime('now'), esp32_ip = ? WHERE id = 1")
+        ->execute([$espIp]);
 
     $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
     $state = $stmt->fetch();

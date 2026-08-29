@@ -101,15 +101,18 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     $recommendation = $analysisResult['recommendation'];
     $aiEngineUsed = $analysisResult['engine'] ?? 'AI Vision Engine';
 
-    // Fetch current device state
-    $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
-    $state = $stmt->fetch();
+    $state = $pdo->query("SELECT * FROM device_state WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
 
-    $roofAction = 'NO_CHANGE';
-    $newRoofStatus = $state['roof_status'];
-    $actionReason = $state['last_action_reason'];
+    // Jika analisis gagal (file tidak valid / API error), jangan ubah status atap.
+    if (!empty($analysisResult['error'])) {
+        $newRoofStatus = $state['roof_status'];
+        $actionReason = 'ERROR AI: ' . ($analysisResult['recommendation'] ?? 'Analisis gagal.');
+    } else {
+        $roofAction = 'NO_CHANGE';
+        $newRoofStatus = $state['roof_status'];
+        $actionReason = $state['last_action_reason'];
 
-    if ($state['control_mode'] === 'AUTO') {
+        if ($state['control_mode'] === 'AUTO') {
         if ($weatherVerdict === 'HUJAN') {
             if ($state['roof_status'] === 'OPEN') {
                 $newRoofStatus = 'CLOSED';
@@ -135,6 +138,7 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
                 $actionReason = "AI Vision ({$aiEngineUsed}): Terdeteksi hanya cahaya lampu ruangan (bukan matahari) - Atap diamankan ditutup.";
             }
         }
+    }
     }
 
     // Update device state
@@ -234,25 +238,56 @@ function getAIConfig($pdo) {
 }
 
 /**
+ * Cek apakah file gambar valid dan bisa dibaca.
+ */
+function isValidImageFile($filePath) {
+    if (!file_exists($filePath) || filesize($filePath) < 100) return false;
+    $imgInfo = @getimagesize($filePath);
+    return ($imgInfo !== false);
+}
+
+/**
  * Main AI Analyzer: dispatch ke provider (Gemini / OpenAI) dengan fallback lokal
+ * Selalu mengembalikan array yang valid; jika gagal, kembalikan error yang ramah pengguna.
  */
 function analyzeSkyWithAI($filePath, $aiConfig = []) {
+    // Validasi file gambar terlebih dahulu
+    if (!isValidImageFile($filePath)) {
+        return [
+            'weather' => 'CERAH',
+            'light_verdict' => 'SUNLIGHT',
+            'confidence' => 0.0,
+            'recommended_minutes' => 0,
+            'recommendation' => 'Gagal membaca gambar: file tidak valid atau rusak.',
+            'details' => "ERROR: Cannot read '" . basename($filePath) . "'. Silakan pastikan gambar yang diambil benar.",
+            'error' => "File gambar tidak valid atau tidak bisa dibaca.",
+            'engine' => 'Invalid'
+        ];
+    }
+
+    $provider = strtolower($aiConfig['provider'] ?? 'local');
+    $lastError = '';
+
     // 1. Google Gemini Vision API
-    if (($aiConfig['provider'] ?? 'local') === 'gemini' && !empty($aiConfig['gemini_key'])) {
+    if ($provider === 'gemini' && !empty($aiConfig['gemini_key'])) {
         $res = callGeminiVisionAPI($filePath, $aiConfig['gemini_key'], $aiConfig['model'] ?: 'gemini-1.5-flash');
         if ($res !== null) {
             $res['engine'] = 'Google Gemini Vision AI';
             return $res;
         }
+        $lastError = 'Gemini API gagal.';
     }
+
     // 2. OpenAI Vision API
-    if (($aiConfig['provider'] ?? 'local') === 'openai' && !empty($aiConfig['openai_key'])) {
+    if ($provider === 'openai' && !empty($aiConfig['openai_key'])) {
         $res = callOpenAIVisionAPI($filePath, $aiConfig['openai_key'], $aiConfig['model'] ?: 'gpt-4o-mini');
         if ($res !== null) {
             $res['engine'] = 'OpenAI Vision API';
             return $res;
         }
+        $lastError = 'OpenAI API gagal.';
     }
+
     // 3. Fallback Local Computer Vision Image Analysis
     $localResult = analyzeSkyImageLocal($filePath);
     $localResult['engine'] = 'Local AI Vision Engine';
@@ -336,6 +371,13 @@ function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini-1.5-flash') {
 
     if ($httpCode === 200 && !empty($response)) {
         $resJson = json_decode($response, true);
+        // Cek apakah API mengembalikan error (misal: model tidak support image)
+        $errStr = json_encode($resJson);
+        if (stripos($errStr, 'does not support image') !== false ||
+            stripos($errStr, 'cannot read') !== false ||
+            stripos($errStr, '"error"') !== false) {
+            return null; // Error -> fallback ke local CV
+        }
         if (isset($resJson['candidates'][0]['content']['parts'][0]['text'])) {
             $aiText = trim($resJson['candidates'][0]['content']['parts'][0]['text']);
             $parsed = json_decode($aiText, true);
@@ -410,6 +452,13 @@ function callOpenAIVisionAPI($filePath, $apiKey, $model = 'gpt-4o-mini') {
 
     if ($httpCode === 200 && !empty($response)) {
         $resJson = json_decode($response, true);
+        // Cek apakah API mengembalikan error (misal: model tidak support image)
+        $errStr = json_encode($resJson);
+        if (stripos($errStr, 'does not support image') !== false ||
+            stripos($errStr, 'cannot read') !== false ||
+            stripos($errStr, '"error"') !== false) {
+            return null; // Error -> fallback ke local CV
+        }
         if (isset($resJson['choices'][0]['message']['content'])) {
             $aiText = trim($resJson['choices'][0]['message']['content']);
             $parsed = json_decode($aiText, true);
@@ -516,4 +565,4 @@ function analyzeSkyImageLocal($filePath) {
         'recommendation' => 'Sinar matahari terdeteksi. Rekomendasi jemur: 60 menit.',
         'details' => 'Analisis citra AI mengonfirmasi pencahayaan sinar matahari.'
     ];
-}
+}

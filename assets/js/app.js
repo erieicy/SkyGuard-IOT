@@ -172,7 +172,7 @@ const App = {
         }
 
         // 5. Update Hardware Status (ESP32)
-        this.updateHardwareStatus(s.esp32_online, s.esp32_last_seen);
+        this.updateHardwareStatus(s.esp32_online, s.esp32_last_seen, s.esp32_ip);
 
         // 6. AI Vision & Recommendation Card
         document.getElementById('aiWeatherBadge').innerText = s.ai_weather_verdict;
@@ -216,6 +216,49 @@ const App = {
 
         // 10. Alerts
         this.renderAlerts(data.alerts || []);
+
+        // 11. Jika ESP32 PUTUS -> kosongkan semua data tampilan (seperti belum diisi)
+        if (!s.esp32_online) {
+            if (roofBadge) {
+                roofBadge.className = 'badge-status badge-status-closed';
+                roofBadge.innerHTML = '<i class="fas fa-plug-circle-xmark"></i> MENUNGGU ESP32';
+            }
+            if (roofStructure) roofStructure.className = 'clothesline-structure roof-state-closed';
+
+            const rainValBadge = document.getElementById('rainSensorVal');
+            if (rainValBadge) {
+                rainValBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/40 inline-flex items-center gap-1.5';
+                rainValBadge.innerHTML = '<span class="pulse-dot offline"></span> MENUNGGU KONEKSI';
+                document.getElementById('rainCard')?.classList.remove('border-red-500/50', 'glow-rose');
+            }
+
+            document.getElementById('lightPercentVal').innerText = '--%';
+            document.getElementById('lightProgressBar').style.width = '0%';
+            const lvb = document.getElementById('lightVerdictBadge');
+            if (lvb) {
+                lvb.className = 'px-2.5 py-0.5 rounded text-xs font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30';
+                lvb.innerHTML = '<i class="fas fa-wifi"></i> BELUM TERHUBUNG';
+            }
+
+            document.getElementById('aiWeatherBadge').innerText = '-';
+            document.getElementById('aiConfidenceVal').innerText = '-';
+            document.getElementById('aiRecommendationText').innerText = 'Menunggu ESP32 terhubung ke Wi-Fi untuk membaca data sensor & kamera.';
+            document.getElementById('aiRecommendedMinutes').innerText = '-';
+            document.getElementById('lastActionReason').innerText = 'ESP32 belum terhubung.';
+            document.getElementById('serverTimeDisplay').innerText = '--:--:--';
+
+            const photoEl = document.getElementById('latestCameraImage');
+            const placeholderEl = document.getElementById('noPhotoPlaceholder');
+            if (photoEl) photoEl.style.display = 'none';
+            if (placeholderEl) {
+                placeholderEl.style.display = 'flex';
+                placeholderEl.innerHTML = '<i class="fas fa-wifi text-3xl mb-2 text-rose-500/40"></i><p class="text-xs font-semibold text-slate-400">ESP32 belum terhubung</p><p class="text-[10px] text-slate-500 mt-0.5">Hubungkan via IP WiFi untuk menampilkan foto langit.</p>';
+            }
+            document.getElementById('latestPhotoTime').innerText = 'Menunggu ESP32';
+            document.getElementById('latestPhotoVerdict').innerText = 'BELUM TERHUBUNG';
+
+            this.updateTimerDisplay({ timer_active: 0, timer_remaining_seconds: 0, timer_end_time: '' });
+        }
     },
 
     generateRaindrops(count = 25) {
@@ -232,17 +275,24 @@ const App = {
         }
     },
 
-    updateHardwareStatus(isOnline, lastSeen) {
+    updateHardwareStatus(isOnline, lastSeen, espIp) {
+        const wrapper = document.querySelector('#espIpInput')?.closest('.flex');
         const dot = document.getElementById('espStatusDot');
         const text = document.getElementById('espStatusText');
+        const ipInput = document.getElementById('espIpInput');
+
+        if (ipInput && espIp && ipInput.value.trim() === '') {
+            ipInput.value = espIp;
+        }
+
         if (isOnline) {
-            dot.className = 'pulse-dot online';
-            text.className = 'text-xs font-semibold text-emerald-400';
-            text.innerText = 'ESP32 ONLINE (TERHUBUNG)';
+            if (wrapper) wrapper.className = 'flex items-center gap-2 bg-emerald-500/20 px-3.5 py-1.5 rounded-xl border border-emerald-500/40 cursor-pointer hover:bg-emerald-500/30 transition-all';
+            if (dot) dot.className = 'pulse-dot online';
+            if (text) { text.className = 'text-xs font-semibold text-emerald-300'; text.innerText = 'TERHUBUNG'; }
         } else {
-            dot.className = 'pulse-dot offline';
-            text.className = 'text-xs font-semibold text-rose-400';
-            text.innerText = 'ESP32 OFFLINE / STANDBY';
+            if (wrapper) wrapper.className = 'flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all';
+            if (dot) dot.className = 'pulse-dot offline';
+            if (text) { text.className = 'text-xs font-semibold text-rose-400'; text.innerText = 'ESP32 STANDBY'; }
         }
     },
 
@@ -493,7 +543,6 @@ const App = {
                     const s = data.settings;
                     const badge = document.getElementById('geminiStatusBadge');
 
-                    // Badge engine
                     if (badge) {
                         if (s.ai_provider === 'gemini' && s.has_gemini_key) {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
@@ -507,14 +556,12 @@ const App = {
                         }
                     }
 
-                    const providerSel = document.getElementById('aiProviderSelect');
-                    if (providerSel) providerSel.value = s.ai_provider || 'local';
-                    const geminiInp = document.getElementById('geminiApiKeyInput');
-                    if (geminiInp) geminiInp.placeholder = s.has_gemini_key ? 'API Key Tersimpan (' + s.masked_gemini_key + ')' : 'Masukkan Google AI Studio API Key';
-                    const openaiInp = document.getElementById('openaiApiKeyInput');
-                    if (openaiInp) openaiInp.placeholder = s.has_openai_key ? 'API Key Tersimpan (' + s.masked_openai_key + ')' : 'Masukkan OpenAI API Key (sk-...)';
-                    const modelInp = document.getElementById('aiModelInput');
-                    if (modelInp) modelInp.value = s.ai_model || '';
+                    const keyInp = document.getElementById('aiApiKeyInput');
+                    if (keyInp) {
+                        keyInp.placeholder = s.has_gemini_key || s.has_openai_key
+                            ? 'API Key Tersimpan (' + (s.masked_gemini_key || s.masked_openai_key) + ')'
+                            : 'Tempel API Key Gemini / OpenAI...';
+                    }
 
                     const hostEl = document.getElementById('serverHostDisplay');
                     if (hostEl) hostEl.innerText = s.server_host || s.detected_host || '-';
@@ -524,17 +571,11 @@ const App = {
     },
 
     saveGeminiKey() {
-        const providerSel = document.getElementById('aiProviderSelect');
-        const geminiInp = document.getElementById('geminiApiKeyInput');
-        const openaiInp = document.getElementById('openaiApiKeyInput');
-        const modelInp = document.getElementById('aiModelInput');
+        const keyInp = document.getElementById('aiApiKeyInput');
         const hostEl = document.getElementById('serverHostDisplay');
 
         const payload = {
-            ai_provider: providerSel ? providerSel.value : 'local',
-            gemini_api_key: geminiInp ? geminiInp.value.trim() : '',
-            openai_api_key: openaiInp ? openaiInp.value.trim() : '',
-            ai_model: modelInp ? modelInp.value.trim() : '',
+            api_key: keyInp ? keyInp.value.trim() : '',
             server_host: hostEl ? hostEl.innerText : ''
         };
 

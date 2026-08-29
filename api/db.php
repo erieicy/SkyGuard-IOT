@@ -153,4 +153,11 @@ function initializeDatabase($pdo) {
             $ins->execute([$key, $val]);
         }
     }
+
+    // Pastikan kolom esp32_ip ada (untuk menampilkan IP ESP32 yang terhubung)
+    try {
+        $pdo->exec("ALTER TABLE device_state ADD COLUMN esp32_ip TEXT DEFAULT NULL");
+    } catch (Exception $e) {
+        // Kolom sudah ada
+    }
 }

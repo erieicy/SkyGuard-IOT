@@ -125,6 +125,7 @@ echo json_encode([
         'updated_at' => $state['updated_at'],
         'esp32_online' => $espOnline,
         'esp32_last_seen' => $state['esp32_last_seen'],
+        'esp32_ip' => $state['esp32_ip'] ?? null,
         'esp32_cam_last_seen' => $state['esp32_cam_last_seen']
     ],
     'alerts' => $alerts,

@@ -28,9 +28,9 @@
    - Grafik telemetri sensor suhu/cahaya/air (*Chart.js*).
    - Galeri foto riwayat cuaca & audit log telemetri sensor.
    - Peringatan audio tersintesis via *Web Audio API*.
-6. **Built-in Hardware Simulator**:
-   - Panel simulator interaktif di dalam dashboard yang memungkinkan pengujian seluruh skenario (hujan, cahaya, preset AI, stopwatch) langsung di browser tanpa memerlukan hardware terpasang.
-7. **Firmware Mikrokontroler Lengkap (.txt)**:
+   6. **Koneksi ESP32 via Wi-Fi IP**:
+    - Masukkan IP ESP32 di kolom WiFi pada dashboard. Saat modul ESP32 terdeteksi polling ke server, tombol indikator berubah **hijau (TERHUBUNG)**; jika putus menjadi **merah (TIDAK TERHUBUNG)** dan seluruh data telemetri ditampilkan kosong.
+   7. **Firmware Mikrokontroler Lengkap (.txt)**:
    - File kode firmware C++/Arduino siap pakai untuk **ESP32** dan **ESP32-CAM** serta panduan skematik pinout lengkap.
 
 ---
@@ -47,15 +47,13 @@ c:/xampp/htdocs/SkyGuard-AI/
 │   ├── ai_analyze.php             # Engine Computer Vision AI (Matahari vs Lampu & Mendung)
 │   ├── history.php                # Endpoint log audit sensor & riwayat foto
 │   ├── alerts.php                 # Endpoint manajemen notifikasi sistem
-│   ├── simulate.php               # Controller hardware simulator
 │   └── seed.php                   # Database seeder untuk data awal
 ├── assets/
 │   ├── css/
 │   │   └── style.css              # Custom Glassmorphism IoT styling & animasi atap
 │   └── js/
 │       ├── app.js                 # Frontend app controller, polling, audio alarm & controls
-│       ├── charts.js              # Visualisasi grafik telemetri Chart.js
-│       └── simulator.js           # Client interaktif hardware simulator
+│       └── charts.js              # Visualisasi grafik telemetri Chart.js
 ├── firmware/
 │   ├── esp32_firmware.txt         # Source code C++/Arduino ESP32 (Sensor & Motor Servo)
 │   ├── esp32_cam_firmware.txt     # Source code C++/Arduino ESP32-CAM (Snapshot & HTTP POST)
@@ -98,11 +96,10 @@ c:/xampp/htdocs/SkyGuard-AI/
      ```
      http://localhost/SkyGuard-AI/
      ```
-3. **Uji Coba dengan Simulator**:
-   - Klik tombol **"Hardware Simulator"** di sudut kanan atas dashboard.
-   - Uji tombol **"Teteskan Air (Hujan)"** -> perhatikan atap jemuran langsung menutup dan membunyikan alarm audio.
-   - Uji preset **"Awan Mendung"** -> perhatikan peringatan dini dan tindakan pengamanan jemuran.
-   - Uji stopwatch timer untuk menguji penutupan atap berbasis durasi waktu.
+ 3. **Hubungkan ESP32 via Wi-Fi**:
+    - Isi IP ESP32 (mis. `192.168.1.x`) di kolom WiFi pojok kanan atas dashboard.
+    - Saat ESP32 mem-poll server, tombol indikator berubah **hijau (TERHUBUNG)**; jika putus menjadi **merah (TIDAK TERHUBUNG)** dan seluruh data telemetri tampil kosong.
+    - Pastikan firmware ESP32 & ESP32-CAM diisi `SERVER_URL` = alamat server di atas (lihat menu Pengaturan AI).
 
 ---
 
@@ -113,14 +110,12 @@ c:/xampp/htdocs/SkyGuard-AI/
 | `GET` | `/api/status.php` | Mengambil status telemetri real-time, sisa timer, dan peringatan aktif. |
 | `POST` | `/api/control.php` | Mengirim perintah buka/tutup atap, switch mode (Auto/Manual/Timer), set durasi timer. |
 | `POST` | `/api/ai_analyze.php` | Menganalisis file citra/foto langit dan mengembalikan klasifikasi AI cuaca. |
-| `GET` | `/api/settings.php?action=get_settings` | Mengambil konfigurasi (provider AI, API key mask, alamat server/IP untuk ESP32). |
-| `POST` | `/api/settings.php?action=save_settings` | Menyimpan provider AI, API key (Gemini/OpenAI), model, & alamat server. |
-| `POST` | `/api/simulate.php` | Hardware Simulator: `sim_sensor`, `sim_weather`, `sim_timer`, `reset`. |
-| `GET` | `/api/esp32.php?action=get_command` | Digunakan ESP32 untuk polling posisi target servo/motor. |
+| `GET` | `/api/settings.php?action=get_settings` | Mengambil konfigurasi (provider AI terdeteksi, API key mask, alamat server/IP untuk ESP32). |
+| `POST` | `/api/settings.php?action=save_settings` | Menyimpan satu API key (otomatis deteksi Gemini/OpenAI) & alamat server. |
+| `GET` | `/api/esp32.php?action=get_command` | Digunakan ESP32 untuk polling posisi target servo/motor & melaporkan IP-nya. |
 | `POST` | `/api/esp32.php?action=update_sensors` | Digunakan ESP32 untuk mengirim nilai sensor air dan cahaya. |
 | `POST` | `/api/esp32.php?action=upload_cam` | Digunakan ESP32-CAM untuk mengunggah foto langit. |
 | `GET` | `/api/history.php` | Mengambil riwayat log telemetri dan galeri foto cuaca. |
-| `POST` | `/api/simulate.php` | Mengontrol simulasi perangkat keras dari browser. |
 
 ---
 

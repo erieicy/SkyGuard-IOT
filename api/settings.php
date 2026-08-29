@@ -72,37 +72,30 @@ if ($action === 'save_gemini_key' || $action === 'save_settings') {
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true) ?? $_POST;
 
-    $provider = strtolower(trim($data['ai_provider'] ?? 'local'));
-    if (!in_array($provider, ['local', 'gemini', 'openai'])) {
-        $provider = 'local';
-    }
-
-    $geminiKey = trim($data['gemini_api_key'] ?? '');
-    $openaiKey = trim($data['openai_api_key'] ?? '');
+    $key = trim($data['api_key'] ?? '');
     $model = trim($data['ai_model'] ?? '');
     $serverHost = trim($data['server_host'] ?? '');
 
-    if ($geminiKey !== '') {
-        $stmt = $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)");
-        $stmt->execute([$geminiKey]);
-    } elseif (isset($data['gemini_api_key'])) {
-        $pdo->prepare("UPDATE settings SET value = '' WHERE key = 'gemini_api_key'")->execute();
+    // Satu key untuk semua: otomatis deteksi provider
+    if ($key !== '') {
+        $provider = (strpos($key, 'sk-') === 0) ? 'openai' : 'gemini';
+        // simpan ke kolom yang sesuai, dan kosongkan kolom lain
+        $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_provider', ?)")->execute([$provider]);
+        $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('gemini_api_key', ?)")->execute([$provider === 'gemini' ? $key : '']);
+        $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('openai_api_key', ?)")->execute([$provider === 'openai' ? $key : '']);
     }
+    // jika key dikosongkan, biarkan key lama tetap (jangan hapus) agar server_host bisa diubah sendiri
 
-    if ($openaiKey !== '') {
-        $stmt = $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('openai_api_key', ?)");
-        $stmt->execute([$openaiKey]);
-    } elseif (isset($data['openai_api_key'])) {
-        $pdo->prepare("UPDATE settings SET value = '' WHERE key = 'openai_api_key'")->execute();
-    }
-
-    $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_provider', ?)")->execute([$provider]);
     $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_model', ?)")->execute([$model]);
     $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('server_host', ?)")->execute([$serverHost]);
 
+    // tentukan provider aktif untuk pesan
+    $cur = $pdo->query("SELECT value FROM settings WHERE key = 'ai_provider'")->fetchColumn();
+    $msgProvider = strtoupper($cur ?: 'LOCAL');
+
     echo json_encode([
         'success' => true,
-        'message' => 'Pengaturan AI Vision berhasil disimpan! (Provider: ' . strtoupper($provider) . ')'
+        'message' => 'Pengaturan AI Vision berhasil disimpan! (Provider: ' . $msgProvider . ')'
     ]);
     exit;
 }

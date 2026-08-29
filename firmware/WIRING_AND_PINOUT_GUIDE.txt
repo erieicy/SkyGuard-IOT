@@ -94,7 +94,7 @@ untuk servo, lalu hubungkan GND power supply ke GND ESP32 (Common Ground).
 [5] LANGKAH PENGUJIAN AWAL:
 --------------------------------------------------------------------------------
 1. Buka folder dashboard di browser: http://localhost/SkyGuard-AI/
-2. Gunakan panel simulator bawaan di Dashboard untuk menguji respon sistem tanpa alat.
+2. Isi IP ESP32 di kolom WiFi dashboard, lalu hubungkan ESP32 ke Wi-Fi sama dengan Laptop XAMPP.
 3. Upload kode `esp32_firmware.txt` ke ESP32 melalui Arduino IDE.
 4. Upload kode `esp32_cam_firmware.txt` ke ESP32-CAM.
 5. Pastikan ESP32 dan Laptop/Server XAMPP berada dalam satu jaringan Wi-Fi yang sama.
