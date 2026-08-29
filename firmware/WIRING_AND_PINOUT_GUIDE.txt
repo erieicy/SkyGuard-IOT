@@ -12,12 +12,10 @@
 2. 1x ESP32-CAM AI-Thinker + Modul Kamera OV2640
 3. 1x Sensor Air Hujan (Raindrop Sensor Module + Driver LM393)
 4. 1x Sensor Cahaya LDR (Light Dependent Resistor) + Resistor 10k Ohm (atau Modul LDR)
-5. 1x Motor Servo Metal Gear MG996R (atau SG90 untuk miniatur/prototype jemuran)
-6. 1x Modul Relay 5V (Opsional, jika memakai Motor DC Linear Actuator)
-7. 1x Buzzer Aktif 5V (Peringatan audio saat hujan/mendung)
-8. 1x Power Supply / Adaptor 5V 2A-3A (Disarankan power eksternal untuk Servo)
-9. Kabel Jumper (Male-to-Female, Male-to-Male)
-10. Rangka Miniatur Jemuran Baju dengan Atap Geser/Canopy Lipat
+ 5. 2x Modul Relay 5V / Driver Motor (atau 2x Linear Actuator DC 5V/12V) — AKTUATOR BUKA & TUTUP atap
+ 6. 1x Power Supply / Adaptor 5V 2A-3A (Disarankan power eksternal untuk aktuator)
+ 7. Kabel Jumper (Male-to-Female, Male-to-Male)
+ 8. Rangka Miniatur Jemuran Baju dengan Atap Geser/Canopy Lipat
 
 --------------------------------------------------------------------------------
 [2] TABEL PINOUT & KONEKSI KABEL ESP32 UTAMA:
@@ -34,20 +32,20 @@
 |                   | GND                 | GND                | Ground Bersama              |
 |                   | AO (Analog Out)     | GPIO 32            | Intensitas Cahaya (0-4095)  |
 +-------------------+---------------------+--------------------+-----------------------------+
-| Motor Servo       | VCC (Kabel Merah)   | 5V Eksternal       | *Gunakan Power Terpisah     |
-| (MG996R / SG90)   | GND (Kabel Coklat)  | GND Eksternal+ESP  | *GND harus digabung         |
-|                   | PWM (Kabel Kuning)  | GPIO 18            | Sinyal Sudut Buka/Tutup     |
+| Aktuator BUKA     | IN Relay / Driver   | GPIO 18            | Pulsa aktif -> atap MEMBUKA |
+| (Relay/Motor 1)   | VCC / Pompa         | 5V Eksternal       | *Gunakan Power Terpisah     |
+|                   | GND                 | GND Eksternal+ESP  | *GND harus digabung         |
 +-------------------+---------------------+--------------------+-----------------------------+
-| Buzzer Audio      | Positif (+)         | GPIO 23            | Peringatan Hujan / Alarm    |
-|                   | Negatif (-)         | GND                | Ground Bersama              |
-+-------------------+---------------------+--------------------+-----------------------------+
-| LED Indikator     | On-board LED        | GPIO 2             | Status Wi-Fi Aktif          |
+| Aktuator TUTUP    | IN Relay / Driver   | GPIO 19            | Pulsa aktif -> atap MENUTUP |
+| (Relay/Motor 2)   | VCC / Pompa         | 5V Eksternal       | *Gunakan Power Terpisah     |
+|                   | GND                 | GND Eksternal+ESP  | *GND harus digabung         |
 +-------------------+---------------------+--------------------+-----------------------------+
 
-*CATATAN PENTING SERVO*:
-Servo MG996R menarik arus hingga 1.5A saat bergerak. JANGAN mengambil daya 5V dari pin ESP32 
-secara langsung karena dapat menyebabkan ESP32 restart (brownout). Gunakan catu daya 5V terpisah 
-untuk servo, lalu hubungkan GND power supply ke GND ESP32 (Common Ground).
+*CATATAN PENTING AKTUATOR*:
+Aktuator (relay/driver motor) menarik arus besar saat bergerak. JANGAN mengambil daya dari pin 
+ESP32 secara langsung. Gunakan catu daya 5V/12V terpisah untuk aktuator, lalu hubungkan GND 
+power supply ke GND ESP32 (Common Ground). Masing-masing aktuator diberi pulsa HIGH selama 
+ROOF_MOVE_MS (default 3 detik) untuk membuka/menutup, lalu LOW.
 
 --------------------------------------------------------------------------------
 [3] TABEL PINOUT ESP32-CAM (AI-THINKER):
@@ -68,8 +66,8 @@ untuk servo, lalu hubungkan GND power supply ke GND ESP32 (Common Ground).
 --------------------------------------------------------------------------------
 1. LOGIKA AIR & HUJAN:
    - Modul sensor air mendeteksi tetesan hujan pada pelat sensor.
-   - Jika air menyentuh sensor (Active LOW), ESP32 secara instan (< 100ms) memutar servo
-     ke sudut 0 derajat (Atap TERTUTUP RAPAT) dan membunyikan alarm buzzer.
+   - Jika air menyentuh sensor (Active LOW), ESP32 secara instan (< 100ms) mengaktifkan
+     aktuator TUTUP (GPIO 19) sehingga atap TERTUTUP RAPAT (tanpa menunggu server).
    - Status terkirim ke REST API Dashboard `api/esp32.php`.
 
 2. LOGIKA CAHAYA & AI VISION:

@@ -6,20 +6,19 @@
   Target Board: ESP32-S / ESP32 DevKit V1
   Author: SkyGuard AI Team
  ============================================================================
-  DESKRIPSI:
-  Kode ini mengontrol:
-  1. Sensor Air / Hujan (Raindrop Sensor) pada GPIO/ADC.
-  2. Sensor Cahaya LDR (Light Dependent Resistor) pada ADC.
-  3. Motor Penggerak Atap Jemuran (Servo Motor MG996R / SG90 atau Relay Motor DC).
-  4. Buzzer Peringatan Saat Hujan / Cuaca Mendung.
-  5. Komunikasi Wi-Fi & REST API ke Dashboard Server SkyGuard AI.
+   DESKRIPSI:
+   Kode ini mengontrol:
+   1. Sensor Air / Hujan (Raindrop Sensor) pada GPIO/ADC.
+   2. Sensor Cahaya LDR (Light Dependent Resistor) pada ADC.
+   3. 2 Aktuator Atap Jemuran (Relay / Motor DC: satu untuk BUKA, satu untuk TUTUP).
+   4. Komunikasi Wi-Fi & REST API ke Dashboard Server SkyGuard AI.
+   Catatan: TIDAK menggunakan servo, buzzer, maupun LED indikator.
  ============================================================================
 */
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <ESP32Servo.h>
 #include <Preferences.h>
 
 // ==========================================
@@ -40,28 +39,22 @@ String serverUrl = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
 #define PIN_RAIN_DIGITAL   34   // Sensor Hujan Digital Output (DO)
 #define PIN_RAIN_ANALOG    35   // Sensor Hujan Analog Output (AO)
 #define PIN_LDR_ANALOG     32   // Sensor Cahaya LDR Analog
-#define PIN_SERVO_ROOF     18   // Pin PWM Kontrol Servo Motor Atap Jemuran
-#define PIN_BUZZER         23   // Pin Buzzer Audio Peringatan Hujan
-#define PIN_LED_STATUS      2   // LED Indikator On-board ESP32
+
+// 2 AKTUATOR ATAP (buka & tutup) — TIDAK ADA servo / buzzer / LED.
+#define ACTUATOR_OPEN_PIN   18  // GPIO penggerak atap MEMBUKA
+#define ACTUATOR_CLOSE_PIN  19  // GPIO penggerak atap MENUTUP
+// Durasi pulsa aktuator (ms) — sesuaikan dengan waktu buka/tutup fisik atap
+const unsigned long ROOF_MOVE_MS = 3000;
 
 // ==========================================
 // 3. VARIABEL & OBJEK KONTROL
 // ==========================================
-Servo roofServo;
-
 // Penyimpanan persisten (EEPROM emulasi) untuk URL Server
 Preferences preferences;
 
 // Web server kecil di ESP32 untuk menerima perintah "Hubungkan" dari Dashboard
 WiFiServer esp32Server(80);
 
-// Posisi Derajat Servo:
-// 180 Derajat = Jemuran Terbuka Penuh
-// 0 Derajat   = Jemuran Tertutup Rapat
-const int SERVO_OPEN_ANGLE   = 180;
-const int SERVO_CLOSED_ANGLE = 0;
-
-int currentServoAngle = SERVO_CLOSED_ANGLE;
 String currentRoofStatus = "CLOSED";
 String controlMode = "AUTO";
 
@@ -81,23 +74,16 @@ void setup() {
   Serial.println("  SKYGUARD AI - ESP32 CONTROLLER BOOTING ");
   Serial.println("========================================");
 
-  // Inisialisasi Pin
+  // Inisialisasi Pin Sensor
   pinMode(PIN_RAIN_DIGITAL, INPUT);
   pinMode(PIN_RAIN_ANALOG, INPUT);
   pinMode(PIN_LDR_ANALOG, INPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED_STATUS, OUTPUT);
 
-  digitalWrite(PIN_BUZZER, LOW);
-  digitalWrite(PIN_LED_STATUS, LOW);
-
-  // Inisialisasi Servo
-  ESP32PWM::allocateTimer(0);
-  roofServo.setPeriodHertz(50); // Standar 50Hz servo
-  roofServo.attach(PIN_SERVO_ROOF, 500, 2400); // Pulse width standard servo
+  // Inisialisasi 2 pin aktuator atap (buka & tutup)
+  setupActuators();
 
   // Set awal atap tertutup untuk keamanan
-  setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", false);
+  moveRoofActuator("CLOSED");
 
   // Hubungkan ke Wi-Fi
   connectToWiFi();
@@ -115,9 +101,6 @@ void setup() {
   // Mulai Web Server kecil di port 80 untuk menerima perintah dari Dashboard
   esp32Server.begin();
   Serial.println("[WEB] ESP32 HTTP Server aktif di port 80. Dashboard dapat mengirim /connect?server=URL");
-
-  // Bunyikan nada beep indikasi sistem aktif
-  playBeep(2, 100);
 }
 
 // ==========================================
@@ -126,10 +109,7 @@ void setup() {
 void loop() {
   // Jaga koneksi Wi-Fi tetap aktif
   if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(PIN_LED_STATUS, LOW);
     connectToWiFi();
-  } else {
-    digitalWrite(PIN_LED_STATUS, HIGH);
   }
 
   // Tangani perintah masuk dari Dashboard (misal: /connect?server=URL)
@@ -151,8 +131,7 @@ void loop() {
   // Jika air menyentuh sensor secara mendadak, langsung tutup atap tanpa menunggu server!
   if (isRainDetected == 1 && currentRoofStatus != "CLOSED") {
     Serial.println("\n[DARURAT] Air hujan terdeteksi! Menutup atap jemuran secara instan...");
-    setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", true);
-    playAlertTone();
+    moveRoofActuator("CLOSED");
   }
 
   // 3. Kirim Telemetri Sensor ke Server
@@ -171,23 +150,37 @@ void loop() {
 }
 
 // ==========================================
-// 6. FUNGSI GERAK MOTOR ATAP JEMURAN
+// 6. FUNGSI GERAK 2 AKTUATOR ATAP JEMURAN
 // ==========================================
-void setRoofPosition(int targetAngle, String statusName, bool smoothMove) {
-  if (smoothMove) {
-    // Gerakan halus (agar mekanisme jemuran awet & tidak tersentak)
-    int step = (targetAngle > currentServoAngle) ? 2 : -2;
-    while (abs(currentServoAngle - targetAngle) > 2) {
-      currentServoAngle += step;
-      roofServo.write(currentServoAngle);
-      delay(15);
-    }
-  }
-  currentServoAngle = targetAngle;
-  roofServo.write(currentServoAngle);
-  currentRoofStatus = statusName;
+void setupActuators() {
+  pinMode(ACTUATOR_OPEN_PIN, OUTPUT);
+  pinMode(ACTUATOR_CLOSE_PIN, OUTPUT);
+  digitalWrite(ACTUATOR_OPEN_PIN, LOW);
+  digitalWrite(ACTUATOR_CLOSE_PIN, LOW);
+  Serial.println("[AKTUATOR] Pin aktuator atap siap | OPEN=GPIO" + String(ACTUATOR_OPEN_PIN) +
+                 " CLOSE=GPIO" + String(ACTUATOR_CLOSE_PIN));
+}
 
-  Serial.printf("[MOTOR] Status Atap: %s | Posisi Servo: %d Derajat\n", statusName.c_str(), currentServoAngle);
+// Gerakkan atap lewat 2 aktuator (pulsa ROOF_MOVE_MS lalu matikan).
+// dir: "OPEN" -> aktuator buka, "CLOSED" -> aktuator tutup.
+void moveRoofActuator(const String& dir) {
+  int pin = -1;
+  if (dir == "CLOSED") {
+    pin = ACTUATOR_CLOSE_PIN;
+    Serial.println("[AKTUATOR] Menutup atap (pulsa aktuator TUTUP)...");
+  } else if (dir == "OPEN") {
+    pin = ACTUATOR_OPEN_PIN;
+    Serial.println("[AKTUATOR] Membuka atap (pulsa aktuator BUKA)...");
+  } else {
+    return;
+  }
+  if (pin >= 0) {
+    digitalWrite(pin, HIGH);
+    delay(ROOF_MOVE_MS);
+    digitalWrite(pin, LOW);
+    currentRoofStatus = dir;
+    Serial.println("[AKTUATOR] Selesai. Status atap: " + dir);
+  }
 }
 
 // ==========================================
@@ -236,7 +229,6 @@ void fetchCommandsFromServer() {
     if (!error) {
       String desiredRoofStatus = doc["roof_status"] | "CLOSED";
       String mode = doc["control_mode"] | "AUTO";
-      int servoAngle = doc["servo_angle"] | 0;
       int rainDetected = doc["rain_detected"] | 0;
 
       controlMode = mode;
@@ -246,10 +238,9 @@ void fetchCommandsFromServer() {
         Serial.printf("[SERVER CMD] Perintah diterima: %s (Mode: %s)\n", desiredRoofStatus.c_str(), mode.c_str());
         
         if (desiredRoofStatus == "OPEN" && rainDetected == 0) {
-          setRoofPosition(SERVO_OPEN_ANGLE, "OPEN", true);
-          playBeep(1, 150);
+          moveRoofActuator("OPEN");
         } else {
-          setRoofPosition(SERVO_CLOSED_ANGLE, "CLOSED", true);
+          moveRoofActuator("CLOSED");
         }
       }
     }
@@ -300,8 +291,7 @@ void handleEsp32Server() {
       preferences.putString("server_url", serverUrl);
       Serial.println("\n[WEB] Perintah 'Hubungkan' diterima dari Dashboard.");
       Serial.println("[WEB] ESP32 akan mempolling server: " + serverUrl);
-      body = "OK. ESP32 sekarang mempolling: " + serverUrl;
-      playBeep(2, 80);
+      body = "SKYGUARD_OK ESP32 Controller mempolling: " + serverUrl;
     } else {
       body = "ERROR: parameter 'server' tidak ditemukan";
     }
@@ -317,28 +307,7 @@ void handleEsp32Server() {
 }
 
 // ==========================================
-// 8. FUNGSI AUDIO BUZZER & BEEP
-// ==========================================
-void playBeep(int times, int durationMs) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    delay(durationMs);
-    digitalWrite(PIN_BUZZER, LOW);
-    if (i < times - 1) delay(100);
-  }
-}
-
-void playAlertTone() {
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    delay(200);
-    digitalWrite(PIN_BUZZER, LOW);
-    delay(80);
-  }
-}
-
-// ==========================================
-// 9. KONEKSI WI-FI
+// 8. KONEKSI WI-FI
 // ==========================================
 void connectToWiFi() {
   Serial.printf("\n[WIFI] Menghubungkan ke: %s ", WIFI_SSID);
@@ -357,10 +326,10 @@ void connectToWiFi() {
     Serial.print("[WIFI] IP Address ESP32 : ");
     Serial.println(WiFi.localIP());          // <-- IP ini yg muncul di Serial Monitor
     Serial.print("[WIFI] Server SkyGuard  : ");
-    Serial.println(SERVER_URL);              // <-- URL XAMPP yg harus dituju ESP32
+    Serial.println(serverUrl);               // <-- URL XAMPP yg harus dituju ESP32
     Serial.println("----------------------------------------------------------");
     Serial.println("  Buka Serial Monitor untuk melihat IP di atas.");
-    Serial.println("  Pastikan SERVER_URL di bawah sudah sama dengan IP Laptop/XAMPP.");
+    Serial.println("  Pastikan serverUrl di atas sudah sama dengan IP Laptop/XAMPP.");
     Serial.println("----------------------------------------------------------");
   } else {
     Serial.println("\n[WIFI] Gagal terhubung ke Wi-Fi. Akan mencoba lagi...");

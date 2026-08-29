@@ -58,10 +58,27 @@ Preferences camPreferences;
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-#define FLASH_LED_PIN      4  // Onboard High-Brightness Flash LED
+#define FLASH_LED_PIN      4  // Onboard High-Brightness Flash LED (kamera, bukan indikator)
 
-// Interval Pengambilan Foto Langit Berkala (misal: tiap 60 detik)
-const unsigned long CAPTURE_INTERVAL = 60000;
+// ==========================================
+// 2B. PIN AKTUATOR ATAP (2 penggerak: buka & tutup)
+//     Tidak ada LED/Buzzer. Atap digerakkan langsung oleh 2 aktuator.
+// ==========================================
+// Mode deploy:
+//   1 = ESP32-CAM LANGSUNG menggerakkan 2 aktuator atap (setup 1 board tunggal).
+//   0 = atap digerakkan oleh ESP32 Controller TERPISAH via polling server
+//       (lihat esp32_firmware.txt); kamera hanya kirim foto & laporkan verdict.
+#define DRIVE_ACTUATORS_FROM_CAM 1
+
+#define ACTUATOR_OPEN_PIN   14  // GPIO penggerak atap MEMBUKA
+#define ACTUATOR_CLOSE_PIN  13  // GPIO penggerak atap MENUTUP
+// Durasi pulsa aktuator (ms) — sesuaikan dengan waktu buka/tutup fisik atap
+const unsigned long ROOF_MOVE_MS = 3000;
+
+// Interval Pengambilan Foto Langit Berkala: tiap 5 menit (300.000 ms).
+// Di-reset setiap kali foto DIAMBIL (baik otomatis maupun manual oleh pengguna),
+// sehingga jika pengguna memfoto di tengah-tengah timer, hitungan 5 menit mulai dari awal.
+const unsigned long CAPTURE_INTERVAL = 300000;
 unsigned long lastCaptureTime = 0;
 
 // Interval Polling Perintah Dashboard (setiap 3 detik)
@@ -80,6 +97,9 @@ void setup() {
 
   pinMode(FLASH_LED_PIN, OUTPUT);
   digitalWrite(FLASH_LED_PIN, LOW);
+
+  // Inisialisasi 2 pin aktuator atap (buka & tutup)
+  setupActuators();
 
   // Inisialisasi Kamera OV2640
   if (!initCamera()) {
@@ -129,9 +149,10 @@ void loop() {
     checkRemoteSnapshotTrigger();
   }
 
-  // 2. Pengambilan foto berkala otomatis
+  // 2. Pengambilan foto berkala otomatis (tiap CAPTURE_INTERVAL)
+  //    Timer di-reset di dalam captureAndUploadSkyImage() -> berlaku juga
+  //    untuk foto manual dari pengguna (hitungan 5 menit mulai dari awal).
   if (millis() - lastCaptureTime >= CAPTURE_INTERVAL) {
-    lastCaptureTime = millis();
     captureAndUploadSkyImage();
   }
 
@@ -305,6 +326,7 @@ void captureAndUploadSkyImage() {
         String response = http.getString();
         Serial.printf("[HTTP UPLOAD] Sukses! Response Code: %d\n", httpResponseCode);
         Serial.println("[AI VERDICT] " + response);
+        handleAiVerdict(response);   // Keluarkan perintah TUTUP / BUKA
       } else {
         Serial.printf("[ERROR] Gagal upload foto. HTTP Error: %s\n", http.errorToString(httpResponseCode).c_str());
       }
@@ -318,6 +340,79 @@ void captureAndUploadSkyImage() {
   }
 
   esp_camera_fb_return(fb); // Bersihkan buffer kamera
+
+  // Reset timer 5 menit: berlaku untuk foto otomatis MAUPUN foto manual pengguna.
+  // Jika pengguna memfoto di tengah-tengah timer, hitungan 5 menit dihitung ulang dari sini.
+  lastCaptureTime = millis();
+}
+
+// ==========================================
+// 6B. PARSE VERDICT AI & KELUARKAN PERINTAH TUTUP / BUKA
+// ==========================================
+void handleAiVerdict(String response) {
+  // Ambil field "roof_action" (atau fallback "new_roof_status") dari JSON respons server.
+  String action = extractJsonField(response, "roof_action");
+  if (action == "") action = extractJsonField(response, "new_roof_status");
+  action = action.toUpperCase();
+
+  if (action == "CLOSED") {
+    Serial.println("============================================");
+    Serial.println("  PERINTAH AI  >>  TUTUP  (tutup atap jemuran)");
+    Serial.println("============================================");
+    if (DRIVE_ACTUATORS_FROM_CAM) moveRoof("CLOSED");   // gerakkan aktuator TUTUP
+  } else if (action == "OPENED" || action == "OPEN") {
+    Serial.println("============================================");
+    Serial.println("  PERINTAH AI  >>  BUKA   (buka atap jemuran)");
+    Serial.println("============================================");
+    if (DRIVE_ACTUATORS_FROM_CAM) moveRoof("OPEN");     // gerakkan aktuator BUKA
+  } else {
+    Serial.println("  PERINTAH AI  >>  TETAP  (tidak ada perubahan atap)");
+  }
+}
+
+// Ekstraksi sederhana nilai string JSON: cari "key":"value"
+String extractJsonField(String json, String key) {
+  int idx = json.indexOf("\"" + key + "\"");
+  if (idx < 0) return "";
+  int colon = json.indexOf(':', idx);
+  if (colon < 0) return "";
+  int q1 = json.indexOf('"', colon);
+  if (q1 < 0) return "";
+  int q2 = json.indexOf('"', q1 + 1);
+  if (q2 < 0) return "";
+  return json.substring(q1 + 1, q2);
+}
+
+// ==========================================
+// 6C. AKTUATOR ATAP: 2 penggerak buka & tutup
+// ==========================================
+void setupActuators() {
+  pinMode(ACTUATOR_OPEN_PIN, OUTPUT);
+  pinMode(ACTUATOR_CLOSE_PIN, OUTPUT);
+  digitalWrite(ACTUATOR_OPEN_PIN, LOW);
+  digitalWrite(ACTUATOR_CLOSE_PIN, LOW);
+  Serial.println("[AKTUATOR] Pin aktuator atap siap | OPEN=GPIO" + String(ACTUATOR_OPEN_PIN) +
+                 " CLOSE=GPIO" + String(ACTUATOR_CLOSE_PIN));
+}
+
+// Gerakkan atap melalui 2 aktuator (pulsa ROOF_MOVE_MS lalu matikan)
+void moveRoof(const String& dir) {
+  int pin = -1;
+  if (dir == "CLOSED") {
+    pin = ACTUATOR_CLOSE_PIN;
+    Serial.println("  >> Mengaktifkan aktuator TUTUP...");
+  } else if (dir == "OPEN" || dir == "OPENED") {
+    pin = ACTUATOR_OPEN_PIN;
+    Serial.println("  >> Mengaktifkan aktuator BUKA...");
+  } else {
+    return; // TETAP: tidak gerakkan aktuator
+  }
+  if (pin >= 0) {
+    digitalWrite(pin, HIGH);
+    delay(ROOF_MOVE_MS);
+    digitalWrite(pin, LOW);
+    Serial.println("  >> Aktuator selesai.");
+  }
 }
 
 // ==========================================
