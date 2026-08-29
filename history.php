@@ -139,6 +139,17 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                             } elseif (stripos($p['ai_classification'], 'HUJAN') !== false) {
                                 $badgeColor = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
                             }
+                            $photoModalData = [
+                                'image'          => $p['image_path'],
+                                'ts'             => $p['timestamp'],
+                                'source'         => $p['source'],
+                                'classification' => $p['ai_classification'],
+                                'confidence'     => round($p['ai_confidence'], 1),
+                                'light'          => $p['light_detected'] ? 'Terang / Ada Cahaya' : 'Gelap',
+                                'roof'           => $p['roof_action'],
+                                'notes'          => $p['notes'] ?: 'Tidak ada catatan analisis khusus.'
+                            ];
+                            $photoModalAttr = htmlspecialchars(json_encode($photoModalData), ENT_QUOTES, 'UTF-8');
                         ?>
                         <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden hover:border-cyan-500/40 transition-all group flex flex-col justify-between">
                             <div class="relative h-44 bg-slate-950 overflow-hidden">
@@ -165,6 +176,12 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                                 <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
                                     <?= htmlspecialchars($p['notes'] ?: 'Tidak ada catatan analisis khusus.') ?>
                                 </p>
+
+                                <button type="button" onclick="skyguardOpenPhotoDetail(this)"
+                                    data-photo="<?= $photoModalAttr ?>"
+                                    class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition-colors mt-1">
+                                    <i class="fas fa-expand-alt"></i> Lihat Selengkapnya
+                                </button>
 
                                 <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                                     <span class="text-slate-400">Tindakan Atap:</span>
@@ -277,8 +294,106 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         </a>
     </div>
 
+    <!-- Modal Detail Foto (Lihat Selengkapnya) -->
+    <div id="photoDetailModal"
+        class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        onclick="if(event.target===this) skyguardClosePhotoDetail()">
+        <div class="glass-panel w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fas fa-camera-retro text-cyan-400"></i> Detail Analisis Foto
+                </h3>
+                <button onclick="skyguardClosePhotoDetail()"
+                    class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <img id="pdImage" src="" alt="Detail Foto Cuaca"
+                    class="w-full rounded-xl border border-slate-700 object-cover max-h-80 bg-slate-950"
+                    onerror="this.style.display='none'">
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="pdClass" class="px-2.5 py-1 rounded-md text-[11px] font-bold border"></span>
+                    <span id="pdConf" class="text-[11px] text-slate-400"></span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-[11px]">
+                    <div class="bg-slate-800/50 rounded-lg p-3">
+                        <span class="text-slate-500 block mb-1">Waktu Tangkap</span>
+                        <span id="pdTs" class="text-slate-200 font-semibold"></span>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-3">
+                        <span class="text-slate-500 block mb-1">Sumber</span>
+                        <span id="pdSrc" class="text-slate-200 font-semibold capitalize"></span>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-3">
+                        <span class="text-slate-500 block mb-1">Cahaya Terdeteksi</span>
+                        <span id="pdLight" class="text-slate-200 font-semibold"></span>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-3">
+                        <span class="text-slate-500 block mb-1">Tindakan Atap</span>
+                        <span id="pdRoof" class="font-bold"></span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/40 rounded-xl p-4">
+                    <span class="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Penjelasan Lengkap Analisis AI</span>
+                    <p id="pdNotes" class="text-xs text-slate-300 leading-relaxed mt-2 whitespace-pre-line"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Skrip penghapusan riwayat foto -->
     <script>
+        function skyguardOpenPhotoDetail(btn) {
+            var d;
+            try { d = JSON.parse(btn.getAttribute('data-photo')); }
+            catch (e) { console.error('Invalid photo data', e); return; }
+
+            document.getElementById('pdImage').src = d.image || '';
+            document.getElementById('pdImage').style.display = d.image ? 'block' : 'none';
+
+            var cls = document.getElementById('pdClass');
+            cls.textContent = d.classification || '-';
+            var badge = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
+            var c = (d.classification || '').toUpperCase();
+            if (c.indexOf('MENDUNG') !== -1) badge = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+            else if (c.indexOf('LAMP') !== -1) badge = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+            else if (c.indexOf('HUJAN') !== -1) badge = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+            cls.className = 'px-2.5 py-1 rounded-md text-[11px] font-bold border ' + badge;
+
+            document.getElementById('pdConf').textContent = 'Akurasi: ' + (d.confidence != null ? d.confidence + '%' : '-');
+            document.getElementById('pdTs').textContent = d.ts || '-';
+            document.getElementById('pdSrc').textContent = d.source || '-';
+            document.getElementById('pdLight').textContent = d.light || '-';
+
+            var roof = document.getElementById('pdRoof');
+            if (d.roof === 'OPENED') { roof.textContent = 'DIBUKA'; roof.className = 'font-bold text-emerald-400'; }
+            else if (d.roof === 'CLOSED') { roof.textContent = 'DITUTUP'; roof.className = 'font-bold text-rose-400'; }
+            else { roof.textContent = 'TETAP'; roof.className = 'font-semibold text-slate-400'; }
+
+            document.getElementById('pdNotes').textContent = d.notes || 'Tidak ada catatan analisis khusus.';
+
+            var m = document.getElementById('photoDetailModal');
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function skyguardClosePhotoDetail() {
+            var m = document.getElementById('photoDetailModal');
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') skyguardClosePhotoDetail();
+        });
+
         function skyguardDeletePhoto(id) {
             if (!confirm('Hapus foto riwayat ini beserta file gambarnya?')) return;
             fetch('api/history.php?action=delete_photo', {
