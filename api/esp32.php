@@ -84,13 +84,7 @@ if ($action === 'connect') {
         exit;
     }
 
-    // Simpan IP & tandai ESP32 sebagai terhubung (perbarui esp32_last_seen ke waktu lokal sekarang)
-    $pdo->prepare("UPDATE device_state SET esp32_ip = ?, esp32_last_seen = datetime('now', 'localtime') WHERE id = 1")
-        ->execute([$ip]);
-
-    // Ping ESP32 untuk memverifikasi bahwa perangkat benar-benar dapat dijangkau.
-    // ESP32 (jika memilki web server kecil) akan merespons; jika tidak, kita anggap tetap terhubung
-    // karena polling otomatis dari firmware akan memperbarui esp32_last_seen.
+    // 1. Verifikasi ESP32 benar-benar dapat dijangkau (ping web server perangkat).
     $reachable = false;
     $pingUrl = 'http://' . $ip . '/';
     $ctx = @stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
@@ -98,9 +92,31 @@ if ($action === 'connect') {
     if ($resp !== false || (isset($http_response_header) && count($http_response_header) > 0)) {
         $reachable = true;
     }
+    // Jika root tidak merespons, coba endpoint /connect (yang pasti ada di firmware).
+    if (!$reachable) {
+        $cctx = @stream_context_create(['http' => ['timeout' => 3, 'ignore_errors' => true, 'method' => 'GET']]);
+        $r2 = @file_get_contents($pingUrl . 'connect?server=ping', false, $cctx, 0, 64);
+        if ($r2 !== false || (isset($http_response_header) && count($http_response_header) > 0)) {
+            $reachable = true;
+        }
+    }
 
-    // Jika server Host tersedia, kirim perintah koneksi ke ESP32 agar ia mulai polling dashboard.
-    // Firmware harus mendukung endpoint /connect?server=URL (lihat firmware esp32_firmware.txt).
+    // Jika perangkat sama sekali tidak merespons, JANGAN tandai sebagai terhubung.
+    if (!$reachable) {
+        echo json_encode([
+            'success' => false,
+            'reachable' => false,
+            'error' => 'ESP32 di ' . $ip . ' tidak merespons. Pastikan perangkat sudah DINYALAKAN dan terhubung ke jaringan yang sama dengan server dashboard.'
+        ]);
+        exit;
+    }
+
+    // 2. Perangkat terjangkau -> simpan IP & tandai sebagai online (perbarui esp32_last_seen).
+    $pdo->prepare("UPDATE device_state SET esp32_ip = ?, esp32_last_seen = datetime('now', 'localtime') WHERE id = 1")
+        ->execute([$ip]);
+
+    // 3. Kirim perintah koneksi ke ESP32 agar ia mulai mem-poll dashboard.
+    //    Firmware harus mendukung endpoint /connect?server=URL (lihat firmware esp32_firmware.txt).
     $serverHost = $pdo->query("SELECT value FROM settings WHERE key = 'server_host'")->fetchColumn();
     if (!empty($serverHost)) {
         $connectUrl = $pingUrl . 'connect?server=' . urlencode($serverHost);
@@ -112,7 +128,7 @@ if ($action === 'connect') {
         'success' => true,
         'message' => 'ESP32 (' . $ip . ') berhasil dihubungkan ke dashboard SkyGuard AI',
         'esp32_ip' => $ip,
-        'reachable' => $reachable
+        'reachable' => true
     ]);
     exit;
 }

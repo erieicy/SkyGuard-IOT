@@ -64,6 +64,26 @@ if ($action !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'delete_sensor_log') {
+        $id = (int)($post['id'] ?? 0);
+        if ($id > 0) {
+            $row = $pdo->query("SELECT id FROM sensor_logs WHERE id = $id")->fetch();
+            if ($row) {
+                $pdo->prepare("DELETE FROM sensor_logs WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true, 'message' => 'Log sensor berhasil dihapus.']);
+                exit;
+            }
+        }
+        echo json_encode(['success' => false, 'error' => 'Log sensor tidak ditemukan.']);
+        exit;
+    }
+
+    if ($action === 'delete_all_sensor_logs') {
+        $pdo->exec("DELETE FROM sensor_logs");
+        echo json_encode(['success' => true, 'message' => 'Semua riwayat log sensor berhasil dihapus.']);
+        exit;
+    }
+
     echo json_encode(['success' => false, 'error' => 'Aksi tidak dikenal']);
     exit;
 }

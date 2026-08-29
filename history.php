@@ -196,11 +196,16 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         <!-- Telemetry Sensor Logs Table -->
         <div class="glass-panel p-6">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                <div>
-                    <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
-                        <i class="fas fa-list-check text-cyan-400"></i> Log Telemetri Sensor & Aksi Sistem
-                    </h2>
-                    <p class="text-xs text-slate-400">Catatan pembacaan sensor dan perubahan posisi atap</p>
+                <div class="flex items-start justify-between gap-3 w-full">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fas fa-list-check text-cyan-400"></i> Log Telemetri Sensor & Aksi Sistem
+                        </h2>
+                        <p class="text-xs text-slate-400">Catatan pembacaan sensor dan perubahan posisi atap</p>
+                    </div>
+                    <button onclick="skyguardDeleteAllSensorLogs()" class="shrink-0 px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all">
+                        <i class="fas fa-trash-can mr-1"></i> Hapus Semua Log
+                    </button>
                 </div>
             </div>
 
@@ -216,12 +221,13 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                             <th class="py-3 px-4">Status Atap</th>
                             <th class="py-3 px-4">Mode</th>
                             <th class="py-3 px-4">Pemicu</th>
+                            <th class="py-3 px-4 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         <?php if (empty($logs)): ?>
                             <tr>
-                                <td colspan="8" class="py-6 text-center text-slate-500">Belum ada data log sensor.</td>
+                                <td colspan="9" class="py-6 text-center text-slate-500">Belum ada data log sensor.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($logs as $l): ?>
@@ -246,6 +252,11 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                                     </td>
                                     <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-[10px]"><?= $l['control_mode'] ?></span></td>
                                     <td class="py-3 px-4 text-slate-400"><?= htmlspecialchars($l['action_triggered'] ?: 'PERIODIC_LOG') ?></td>
+                                    <td class="py-3 px-4">
+                                        <button onclick="skyguardDeleteSensorLog(<?= (int)$l['id'] ?>)" title="Hapus log ini" class="px-2 py-1 rounded bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white text-[10px] transition-colors">
+                                            <i class="fas fa-trash-can"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -295,6 +306,32 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
             .then(d => {
                 if (d.success) { location.reload(); }
                 else { alert(d.error || 'Gagal menghapus foto.'); }
+            })
+            .catch(e => alert('Gagal berkomunikasi dengan server.'));
+        }
+
+        function skyguardDeleteSensorLog(id) {
+            if (!confirm('Hapus log sensor ini?')) return;
+            fetch('api/history.php?action=delete_sensor_log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) { location.reload(); }
+                else { alert(d.error || 'Gagal menghapus log.'); }
+            })
+            .catch(e => alert('Gagal berkomunikasi dengan server.'));
+        }
+
+        function skyguardDeleteAllSensorLogs() {
+            if (!confirm('Hapus SELURUH riwayat log sensor? Tindakan ini tidak dapat dibatalkan.')) return;
+            fetch('api/history.php?action=delete_all_sensor_logs', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) { location.reload(); }
+                else { alert(d.error || 'Gagal menghapus log.'); }
             })
             .catch(e => alert('Gagal berkomunikasi dengan server.'));
         }

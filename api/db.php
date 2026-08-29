@@ -79,6 +79,59 @@ function getDbConnection() {
     return $pdo;
 }
 
+/**
+ * Terapkan perintah perubahan status atap (OPEN/CLOSED) secara terpusat.
+ * Digunakan baik oleh kontrol manual (control.php) maupun oleh AI Vision
+ * (ai_analyze.php) agar setiap "input" atap tercatat sebagai log sensor
+ * yang konsisten dengan perlindungan keamanan (tidak bisa membuka saat hujan).
+ *
+ * @param PDO    $pdo
+ * @param string $status  'OPEN' | 'CLOSED'
+ * @param string $reason  Alasan perubahan (ditampilkan di dashboard)
+ * @param string $source  Pemicu: 'MANUAL_OVERRIDE', 'AI_VISION', 'TIMER', 'AUTO_LOGIC', dll
+ * @return array ['success'=>bool, 'roof_status'=>?string, 'error'=>?string]
+ */
+function applyRoofCommand($pdo, $status, $reason, $source = 'MANUAL_OVERRIDE') {
+    $status = strtoupper(trim($status));
+    if (!in_array($status, ['OPEN', 'CLOSED'])) {
+        return ['success' => false, 'error' => 'Status atap tidak valid.'];
+    }
+    $reason = trim($reason) ?: ($status === 'OPEN' ? 'Atap dibuka secara manual.' : 'Atap ditutup secara manual.');
+
+    // Perlindungan keamanan: jangan buka atap jika sensor air mendeteksi hujan.
+    $st = $pdo->query("SELECT rain_detected FROM device_state WHERE id = 1")->fetch();
+    if ($status === 'OPEN' && $st && (int)$st['rain_detected'] === 1) {
+        return [
+            'success' => false,
+            'error' => 'PERINGATAN: Sensor mendeteksi air/hujan! Atap tidak dapat dibuka untuk melindungi jemuran.'
+        ];
+    }
+
+    $pdo->prepare("
+        UPDATE device_state
+        SET roof_status = ?, last_action_reason = ?, updated_at = datetime('now', 'localtime')
+        WHERE id = 1
+    ")->execute([$status, $reason]);
+
+    // Catat sebagai log telemetri agar input atap (termasuk dari AI) terlihat di riwayat.
+    $info = $pdo->query("SELECT rain_detected, light_level, control_mode, ai_weather_verdict, ai_light_verdict FROM device_state WHERE id = 1")->fetch();
+    $pdo->prepare("
+        INSERT INTO sensor_logs
+            (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
+        VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
+    ")->execute([
+        (int)($info['rain_detected'] ?? 0),
+        (int)($info['light_level'] ?? 0),
+        $status,
+        $info['control_mode'] ?? 'AUTO',
+        $info['ai_weather_verdict'] ?? 'CERAH',
+        $info['ai_light_verdict'] ?? 'SUNLIGHT',
+        $source
+    ]);
+
+    return ['success' => true, 'roof_status' => $status];
+}
+
 function initializeDatabase($pdo) {
     // 1. Device State Table (single row for real-time status)
     $pdo->exec("

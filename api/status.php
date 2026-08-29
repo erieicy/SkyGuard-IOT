@@ -127,7 +127,19 @@ echo json_encode([
         'esp32_online' => $espOnline,
         'esp32_last_seen' => $state['esp32_last_seen'],
         'esp32_ip' => $state['esp32_ip'] ?? null,
-        'esp32_cam_last_seen' => $state['esp32_cam_last_seen']
+        'esp32_cam_last_seen' => $state['esp32_cam_last_seen'],
+        'ai_roof_recommendation' => (function($s) {
+            if ((int)$s['rain_detected'] === 1 || in_array($s['ai_weather_verdict'], ['MENDUNG', 'HUJAN'])) {
+                return 'CLOSED';
+            }
+            if ($s['ai_light_verdict'] === 'SUNLIGHT' && in_array($s['ai_weather_verdict'], ['CERAH', 'BERAWAN']) && (int)$s['rain_detected'] === 0) {
+                return 'OPEN';
+            }
+            if (in_array($s['ai_light_verdict'], ['ARTIFICIAL_LAMP', 'DARK']) || $s['ai_weather_verdict'] === 'MALAM') {
+                return 'CLOSED';
+            }
+            return 'NO_CHANGE';
+        })($state)
     ],
     'alerts' => $alerts,
     'latest_photo' => $latestPhoto,

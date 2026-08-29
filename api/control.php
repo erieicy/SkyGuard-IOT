@@ -39,37 +39,19 @@ switch ($action) {
             exit;
         }
 
-        // Safety check: Cannot open roof if rain is currently detected
-        if ($newStatus === 'OPEN' && $state['rain_detected'] == 1) {
-            echo json_encode([
-                'success' => false, 
-                'error' => 'PERINGATAN: Sensor mendeteksi air/hujan! Atap tidak dapat dibuka demi melindungi jemuran.'
-            ]);
-            exit;
-        }
-
         $reason = $data['reason'] ?? ($newStatus === 'OPEN' ? 'Manual: Atap dibuka oleh pengguna' : 'Manual: Atap ditutup oleh pengguna');
 
-        $update = $pdo->prepare("
-            UPDATE device_state 
-            SET roof_status = ?,
-                last_action_reason = ?,
-                updated_at = datetime('now', 'localtime')
-            WHERE id = 1
-        ");
-        $update->execute([$newStatus, $reason]);
-
-        // Insert sensor log
-        $log = $pdo->prepare("
-            INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
-            VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $log->execute([$state['rain_detected'], $state['light_level'], $newStatus, $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict'], 'MANUAL_OVERRIDE']);
+        // Gunakan fungsi terpusat agar AI & manual konsisten (termasuk log & proteksi hujan).
+        $res = applyRoofCommand($pdo, $newStatus, $reason, 'MANUAL_OVERRIDE');
+        if (!$res['success']) {
+            echo json_encode(['success' => false, 'error' => $res['error']]);
+            exit;
+        }
 
         echo json_encode([
             'success' => true, 
             'message' => 'Status atap berhasil diubah menjadi ' . $newStatus,
-            'roof_status' => $newStatus
+            'roof_status' => $res['roof_status']
         ]);
         break;
 

@@ -232,7 +232,7 @@ const App = {
                 document.getElementById('rainCard')?.classList.remove('border-red-500/50', 'glow-rose');
             }
 
-            document.getElementById('lightPercentVal').innerText = '--%';
+            document.getElementById('lightPercentVal').innerText = '0%';
             document.getElementById('lightProgressBar').style.width = '0%';
             const lvb = document.getElementById('lightVerdictBadge');
             if (lvb) {
@@ -241,9 +241,9 @@ const App = {
             }
 
             document.getElementById('aiWeatherBadge').innerText = '-';
-            document.getElementById('aiConfidenceVal').innerText = '-';
+            document.getElementById('aiConfidenceVal').innerText = '0%';
             document.getElementById('aiRecommendationText').innerText = 'Menunggu ESP32 terhubung ke Wi-Fi untuk membaca data sensor & kamera.';
-            document.getElementById('aiRecommendedMinutes').innerText = '-';
+            document.getElementById('aiRecommendedMinutes').innerText = '0';
             document.getElementById('lastActionReason').innerText = 'ESP32 belum terhubung.';
             document.getElementById('serverTimeDisplay').innerText = '--:--:--';
 
@@ -406,6 +406,22 @@ const App = {
             }
         })
         .catch(err => console.error('Control error:', err));
+    },
+
+    // AI Vision dapat "membuat input" mengubah posisi atap berdasarkan
+    // analisis terbaru (rekomendasi: OPEN / CLOSED / NO_CHANGE).
+    applyAiRecommendation() {
+        const s = appState;
+        if (!s) {
+            showToast('Belum ada data analisis AI.', 'info');
+            return;
+        }
+        const rec = s.ai_roof_recommendation || 'NO_CHANGE';
+        if (rec === 'NO_CHANGE') {
+            showToast('AI tidak menyarankan perubahan posisi atap saat ini.', 'info');
+            return;
+        }
+        this.setRoof(rec);
     },
 
     setMode(mode) {

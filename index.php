@@ -304,6 +304,9 @@
                     <span>Target Jemur:</span>
                     <span><span id="aiRecommendedMinutes">45</span> Menit</span>
                 </div>
+                <button onclick="App.applyAiRecommendation()" id="btnApplyAiRoof" title="Terapkan saran AI untuk membuka/menutup atap" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-cyan-600/90 hover:bg-cyan-500 text-white text-[11px] font-semibold shadow transition-all flex items-center justify-center gap-1.5">
+                    <i class="fas fa-robot"></i> Terapkan Saran AI (Buka/Tutup Atap)
+                </button>
             </div>
 
             <!-- Card 4: Stopwatch Timer Quick Widget -->
@@ -327,9 +330,9 @@
                 <!-- If Timer Inactive (Set Presets) -->
                 <div id="setTimerControls" class="my-2">
                     <div class="grid grid-cols-3 gap-1.5 mb-2">
-                        <button onclick="App.startTimer(15)" class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-violet-600/40 text-slate-200 border border-slate-700 transition-all">15m</button>
-                        <button onclick="App.startTimer(30)" class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-violet-600/40 text-slate-200 border border-slate-700 transition-all">30m</button>
                         <button onclick="App.startTimer(60)" class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-violet-600/40 text-slate-200 border border-slate-700 transition-all">60m</button>
+                        <button onclick="App.startTimer(90)" class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-violet-600/40 text-slate-200 border border-slate-700 transition-all">90m</button>
+                        <button onclick="App.startTimer(120)" class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-violet-600/40 text-slate-200 border border-slate-700 transition-all">120m</button>
                     </div>
                     <div class="flex gap-1.5">
                         <input id="customTimerInput" type="number" placeholder="Menit..." min="1" max="720" value="45" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-violet-500">
@@ -547,17 +550,10 @@
             <i class="fas fa-gauge-high"></i>
             <span>Dashboard</span>
         </a>
-        <button onclick="LiveCamera.open()" class="mobile-snap-btn-center" title="Foto Langsung">
-            <i class="fas fa-camera"></i>
-        </button>
         <a href="history.php" class="mobile-nav-item">
             <i class="fas fa-images"></i>
             <span>Riwayat AI</span>
         </a>
-        <button onclick="document.getElementById('settingsModal').classList.remove('hidden')" class="mobile-nav-item">
-            <i class="fas fa-gear"></i>
-            <span>Pengaturan</span>
-        </button>
     </div>
 
     <!-- Live Toast Notification Container -->

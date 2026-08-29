@@ -102,13 +102,13 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     $aiEngineUsed = $analysisResult['engine'] ?? 'AI Vision Engine';
 
     $state = $pdo->query("SELECT * FROM device_state WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+    $roofAction = 'NO_CHANGE';
 
     // Jika analisis gagal (file tidak valid / API error), jangan ubah status atap.
     if (!empty($analysisResult['error'])) {
         $newRoofStatus = $state['roof_status'];
         $actionReason = 'ERROR AI: ' . ($analysisResult['recommendation'] ?? 'Analisis gagal.');
     } else {
-        $roofAction = 'NO_CHANGE';
         $newRoofStatus = $state['roof_status'];
         $actionReason = $state['last_action_reason'];
 
@@ -141,11 +141,16 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     }
     }
 
-    // Update device state
+    // Jika AI memutuskan untuk mengubah posisi atap (AUTO), terapkan sebagai
+    // "input" AI Vision melalui fungsi terpusat (termasuk log & proteksi hujan).
+    if ($roofAction !== 'NO_CHANGE') {
+        applyRoofCommand($pdo, $newRoofStatus, $actionReason, 'AI_VISION');
+    }
+
+    // Update device state (tanpa roof_status; dikelola oleh applyRoofCommand di atas)
     $update = $pdo->prepare("
         UPDATE device_state 
-        SET roof_status = ?,
-            ai_light_verdict = ?,
+        SET ai_light_verdict = ?,
             ai_weather_verdict = ?,
             ai_confidence = ?,
             ai_drying_recommendation = ?,
@@ -156,7 +161,6 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
         WHERE id = 1
     ");
     $update->execute([
-        $newRoofStatus,
         $lightVerdict,
         $weatherVerdict,
         $confidence,
