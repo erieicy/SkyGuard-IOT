@@ -260,6 +260,11 @@ function initializeDatabase($pdo) {
         // Kolom sudah ada
     }
 
+    // Kolom untuk proses koneksi yang menunggu konfirmasi dari ESP32 (bukan langsung "terhubung")
+    try { $pdo->exec("ALTER TABLE device_state ADD COLUMN pending_esp32_ip TEXT DEFAULT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE device_state ADD COLUMN pending_since TEXT DEFAULT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE device_state ADD COLUMN esp32_disconnected INTEGER DEFAULT 0"); } catch (Exception $e) {}
+
     // Migrasi satu kali: ubah timestamp UTC (dari CURRENT_TIMESTAMP lama) ke waktu lokal (WIB)
     // agar seluruh riwayat & log sesuai dengan jam dunia nyata.
     $tzMigrated = $pdo->query("SELECT value FROM settings WHERE key = 'tz_migrated'")->fetchColumn();

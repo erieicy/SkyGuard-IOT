@@ -199,7 +199,7 @@ void handleCamEsp32Server() {
       camPreferences.putString("server_url", baseServerUrl);
       Serial.println("\n[WEB] Perintah 'Hubungkan' diterima dari Dashboard.");
       Serial.println("[WEB] ESP32-CAM akan mempolling server: " + baseServerUrl);
-      body = "OK. ESP32-CAM sekarang mempolling: " + baseServerUrl;
+      body = "SKYGUARD_OK ESP32-CAM sekarang mempolling: " + baseServerUrl;
     } else {
       body = "ERROR: parameter 'server' tidak ditemukan";
     }

@@ -51,6 +51,8 @@ const AudioAlerts = {
 const App = {
     init() {
         console.log('Initializing SkyGuard AI Dashboard...');
+        this._connecting = false;
+        this._connectStart = 0;
         initTelemetryChart();
         this.fetchStatus();
         this.loadSettings();
@@ -72,12 +74,30 @@ const App = {
             .then(data => {
                 if (data.success) {
                     appState = data.state;
+
+                    // Proses "menunggu" koneksi ESP32: status baru TERHUBUNG
+                    // setelah ESP32 benar-benar mem-poll server kita.
+                    if (this._connecting) {
+                        if (appState.esp32_online) {
+                            this._connecting = false;
+                            AudioAlerts.playSuccessTone();
+                            showToast('ESP32 berhasil terhubung ke dashboard!', 'success');
+                        } else if (Date.now() - (this._connectStart || 0) > 30000) {
+                            this._connecting = false;
+                            showToast('ESP32 tidak membalas koneksi dalam 30 detik. Koneksi dibatalkan.', 'danger');
+                            fetch('api/esp32.php?action=disconnect', { method: 'POST' }).catch(() => {});
+                        }
+                    }
+
                     this.renderState(data);
+                    this.updateConnectButton();
                 }
             })
             .catch(err => {
                 console.error('Fetch status error:', err);
+                this._connecting = false;
                 this.updateHardwareStatus(false);
+                this.updateConnectButton();
             });
     },
 
@@ -292,7 +312,7 @@ const App = {
         } else {
             if (wrapper) wrapper.className = 'flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all';
             if (dot) dot.className = 'pulse-dot offline';
-            if (text) { text.className = 'text-xs font-semibold text-rose-400'; text.innerText = 'ESP32 STANDBY'; }
+            if (text) { text.className = 'text-xs font-semibibold text-rose-400'; text.innerText = 'TERPUTUS'; }
         }
     },
 
@@ -550,24 +570,11 @@ const App = {
             return;
         }
 
-        showToast('🔗 Menghubungkan ESP32 (' + ip + ') ke dashboard...', 'info');
-
-        const btn = document.getElementById('btnConnectEsp32');
-        const origHTML = btn ? btn.innerHTML : '';
-        const origClass = btn ? btn.className : '';
-        const setConnecting = () => {
-            if (!btn) return;
-            btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-white border border-yellow-500/40 shadow flex items-center gap-1.5 transition-all opacity-90 cursor-wait';
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span class="hidden sm:inline">Menghubungkan...</span>';
-            btn.disabled = true;
-        };
-        const restoreBtn = () => {
-            if (!btn) return;
-            btn.className = origClass;
-            btn.innerHTML = origHTML;
-            btn.disabled = false;
-        };
-        setConnecting();
+        // Masuk ke mode "menunggu": tombol kuning + teks Menghubungkan...
+        this._connecting = true;
+        this._connectStart = Date.now();
+        this.setConnectButtonState('connecting');
+        showToast('🔗 Mengirim perintah ke ESP32 (' + ip + ')...', 'info');
 
         fetch('api/esp32.php?action=connect', {
             method: 'POST',
@@ -576,22 +583,79 @@ const App = {
         })
         .then(res => res.json())
         .then(data => {
-            restoreBtn();
-            if (data.success) {
-                AudioAlerts.playSuccessTone();
-                showToast(data.message + ' — ESP32 terhubung!', 'success');
+            if (data.success && data.status === 'pending') {
+                // Perintah terkirim & perangkat terverifikasi SkyGuard.
+                // Tunggu hingga ESP32 benar-benar mem-poll balik (status menjadi online).
+                showToast(data.message, 'info');
+                this._connecting = true; // tetap menunggu
+                this.fetchStatus();
+            } else if (data.success) {
+                this._connecting = false;
+                showToast(data.message, 'success');
                 this.fetchStatus();
             } else {
-                // Tidak menghidupkan sistem karena belum benar-benar terhubung.
+                // Bukan perangkat SkyGuard / gagal -> jangan nyalakan sistem.
+                this._connecting = false;
                 showToast(data.error || 'Gagal menghubungkan ESP32', 'danger');
-                this.fetchStatus();
+                this.updateConnectButton();
             }
         })
         .catch(err => {
-            restoreBtn();
+            this._connecting = false;
             console.error('Connect ESP32 error:', err);
             showToast('Gagal mengirim perintah koneksi ke server', 'danger');
+            this.updateConnectButton();
         });
+    },
+
+    disconnectEsp32(silent) {
+        this._connecting = false;
+        fetch('api/esp32.php?action=disconnect', { method: 'POST' })
+            .then(res => res.json())
+            .then(() => {
+                if (!silent) showToast('Koneksi ESP32 diputus.', 'info');
+                this.fetchStatus();
+            })
+            .catch(err => {
+                if (!silent) showToast('Gagal memutus koneksi', 'danger');
+                this.fetchStatus();
+            });
+    },
+
+    toggleEsp32Connection() {
+        if (this._connecting) return; // sedang menunggu, abaikan
+        if (appState && appState.esp32_online) {
+            this.disconnectEsp32(false);
+        } else {
+            this.connectEsp32();
+        }
+    },
+
+    // Mengatur tampilan tombol Hubungkan / Menghubungkan... / Putuskan
+    setConnectButtonState(state) {
+        const btn = document.getElementById('btnConnectEsp32');
+        if (!btn) return;
+        if (state === 'connecting') {
+            btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-white border border-yellow-500/40 shadow flex items-center gap-1.5 transition-all opacity-90 cursor-wait';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span class="hidden sm:inline">Menghubungkan...</span>';
+            btn.disabled = true;
+        } else if (state === 'connected') {
+            btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white border border-rose-500/40 shadow flex items-center gap-1.5 transition-all';
+            btn.innerHTML = '<i class="fas fa-unlink"></i> <span class="hidden sm:inline">Putuskan</span>';
+            btn.disabled = false;
+        } else {
+            btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-500/40 shadow flex items-center gap-1.5 transition-all';
+            btn.innerHTML = '<i class="fas fa-link"></i> <span class="hidden sm:inline">Hubungkan</span>';
+            btn.disabled = false;
+        }
+    },
+
+    updateConnectButton() {
+        if (this._connecting) {
+            this.setConnectButtonState('connecting');
+            return;
+        }
+        this.setConnectButtonState((appState && appState.esp32_online) ? 'connected' : 'disconnected');
     },
 
     triggerEsp32CamSnapshot() {
