@@ -557,7 +557,7 @@
     </div>
 
     <!-- Live Toast Notification Container -->
-    <div id="liveToast" class="fixed top-4 right-4 sm:top-6 sm:right-6 z-[1001] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none border-cyan-500/40 bg-slate-900/90 text-cyan-100">
+    <div id="liveToast" class="fixed top-20 right-4 sm:right-6 z-[1001] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none border-cyan-500/40 bg-slate-900/90 text-cyan-100">
         <i id="liveToastIcon" class="fas fa-info-circle text-lg text-cyan-400"></i>
         <span id="liveToastMsg" class="text-xs font-semibold">Notifikasi</span>
     </div>
