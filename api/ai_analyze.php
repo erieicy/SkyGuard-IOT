@@ -137,6 +137,12 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
                 $roofAction = 'CLOSED';
                 $actionReason = "AI Vision ({$aiEngineUsed}): Terdeteksi hanya cahaya lampu ruangan (bukan matahari) - Atap diamankan ditutup.";
             }
+        } elseif (in_array($weatherVerdict, ['MALAM']) || $lightVerdict === 'DARK') {
+            if ($state['roof_status'] === 'OPEN') {
+                $newRoofStatus = 'CLOSED';
+                $roofAction = 'CLOSED';
+                $actionReason = "AI Vision ({$aiEngineUsed}): Kondisi gelap/malam terdeteksi - Atap ditutup untuk keamanan jemuran.";
+            }
         }
     }
     }
