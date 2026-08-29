@@ -66,9 +66,6 @@
 
         <!-- Right System Status -->
         <div class="flex items-center gap-3">
-            <button onclick="document.getElementById('settingsModal').classList.toggle('hidden')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-cyan-500/40 shadow flex items-center gap-2 transition-all">
-                <i class="fas fa-gear text-cyan-400"></i> <span class="hidden sm:inline">Pengaturan</span> AI
-            </button>
             <div class="flex items-center gap-2">
                 <input id="espIpInput" type="text" placeholder="IP ESP32 (WiFi)" class="w-32 sm:w-40 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500" />
                 <button onclick="App.connectEsp32()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-500/40 shadow flex items-center gap-1.5 transition-all">
@@ -389,15 +386,6 @@
                         <i class="fas fa-tower-broadcast text-base"></i> Minta ESP32-CAM Ambil Foto
                     </button>
                     
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="LiveCamera.open()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold border border-slate-700 transition-all">
-                            <i class="fas fa-camera text-xs text-cyan-400"></i> Kamera HP/Webcam
-                        </button>
-                        <label class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 cursor-pointer transition-all">
-                            <i class="fas fa-folder-open text-xs"></i> Unggah Foto
-                            <input type="file" accept="image/*" class="hidden" onchange="App.uploadUserPhoto(this)">
-                        </label>
-                    </div>
                 </div>
             </div>
 
@@ -520,8 +508,8 @@
                         <i class="fas fa-gear"></i>
                     </div>
                     <div>
-                        <h3 class="text-sm font-bold text-slate-100">Pengaturan AI Vision Engine</h3>
-                        <p class="text-[11px] text-slate-400">Konfigurasi Google Gemini Vision API</p>
+                        <h3 class="text-sm font-bold text-slate-100">Pengaturan Sistem</h3>
+                        <p class="text-[11px] text-slate-400">Koneksi ESP32 &amp; Konfigurasi AI Vision (via .env)</p>
                     </div>
                 </div>
                 <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
@@ -530,16 +518,6 @@
             </div>
 
             <div class="space-y-4 text-xs">
-                <div>
-                    <label class="font-bold text-slate-200 block mb-1.5">API Key AI Vision (Satu Kunci Untuk Semua):</label>
-                    <input type="password" id="aiApiKeyInput" placeholder="Tempel API Key Gemini / OpenAI..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-                    <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                        Cukup satu key. Sistem otomatis mendeteksi provider-nya:
-                        key diawali <code>sk-</code> &rarr; <strong>OpenAI</strong>, selain itu &rarr; <strong>Google Gemini</strong>.
-                        Biarkan kosong untuk menggunakan <strong>Local AI Vision</strong> (offline, tanpa API).
-                    </p>
-                </div>
-
                 <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800">
                     <label class="font-bold text-slate-200 block mb-1.5">Alamat Server untuk Firmware ESP32:</label>
                     <p class="text-[10px] text-slate-400 mb-1">Isi IP/host ini ke variabel <code>SERVER_URL</code> / <code>SERVER_UPLOAD_URL</code> di kode firmware agar ESP32 bisa terhubung.</p>
@@ -548,14 +526,16 @@
                         <button onclick="App.loadSettings()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] border border-slate-700">Refresh</button>
                     </div>
                 </div>
+
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                    <i class="fas fa-file-code mr-1 text-cyan-400"></i> Konfigurasi AI Vision dilakukan langsung via file <code>.env</code> di root proyek
+                    (<code>AI_PROVIDER</code>, <code>AI_API_KEY</code>, <code>AI_MODEL</code>). Edit file tersebut untuk mengubah provider / API key.
+                </p>
             </div>
 
             <div class="mt-5 pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
                 <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-all">
-                    Batal
-                </button>
-                <button onclick="App.saveGeminiKey()" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition-all">
-                    Simpan Pengaturan
+                    Tutup
                 </button>
             </div>
         </div>

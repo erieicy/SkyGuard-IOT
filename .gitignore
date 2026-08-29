@@ -5,3 +5,7 @@ data/*.db-journal
 # Ignore dynamic user uploads but keep sample images
 uploads/sky_*
 uploads/esp32cam_*
+
+# Ignore environment / secret files (API keys)
+.env
+

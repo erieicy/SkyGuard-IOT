@@ -38,15 +38,15 @@ function checkTimerExpiration($pdo, &$state) {
 
             // Insert alert
             $alert = $pdo->prepare("
-                INSERT INTO alerts (alert_type, title, message, severity)
-                VALUES ('TIMER_EXPIRED', 'Waktu Jemur Selesai', 'Stopwatch timer telah berakhir. Atap jemuran telah ditutup otomatis demi menjaga pakaian.', 'success')
+                INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+                VALUES (datetime('now', 'localtime'), 'TIMER_EXPIRED', 'Waktu Jemur Selesai', 'Stopwatch timer telah berakhir. Atap jemuran telah ditutup otomatis demi menjaga pakaian.', 'success')
             ");
             $alert->execute();
 
             // Insert sensor log
             $log = $pdo->prepare("
-                INSERT INTO sensor_logs (rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
-                VALUES (?, ?, 'CLOSED', ?, ?, ?, 'TIMER_AUTO_CLOSE')
+                INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
+                VALUES (datetime('now', 'localtime'), ?, ?, 'CLOSED', ?, ?, ?, 'TIMER_AUTO_CLOSE')
             ");
             $log->execute([$state['rain_detected'], $state['light_level'], $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict']]);
 
@@ -84,12 +84,13 @@ if ($state['timer_active'] == 1 && !empty($state['timer_end_time'])) {
 $alertsStmt = $pdo->query("SELECT * FROM alerts ORDER BY id DESC LIMIT 10");
 $alerts = $alertsStmt->fetchAll();
 
-// Check ESP online status (active if seen in last 30 seconds)
-// Gunakan timezone UTC konsisten dengan penyimpanan esp32_last_seen (datetime('now') -> UTC)
+// Check ESP online status (active if seen in last 45 seconds)
+// esp32_last_seen disimpan dalam waktu lokal (datetime('now','localtime'));
+// bandingkan dengan waktu lokal sekarang (zona waktu Asia/Jakarta via db.php).
 $espOnline = false;
 if (!empty($state['esp32_last_seen'])) {
-    $lastSeen = new DateTime($state['esp32_last_seen'], new DateTimeZone('UTC'));
-    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $lastSeen = new DateTime($state['esp32_last_seen']);
+    $now = new DateTime('now');
     $diffSec = $now->getTimestamp() - $lastSeen->getTimestamp();
     $espOnline = ($diffSec <= 45);
 }

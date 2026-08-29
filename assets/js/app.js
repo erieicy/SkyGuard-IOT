@@ -584,60 +584,27 @@ const App = {
             .then(data => {
                 if (data.success) {
                     const s = data.settings;
-                    const badge = document.getElementById('geminiStatusBadge');
 
+                    const hostEl = document.getElementById('serverHostDisplay');
+                    if (hostEl) hostEl.innerText = s.server_host || s.detected_host || '-';
+
+                    // Tampilkan engine AI aktif (konfigurasi via .env)
+                    const badge = document.getElementById('geminiStatusBadge');
                     if (badge) {
-                        if (s.ai_provider === 'gemini' && s.has_gemini_key) {
+                        if (s.ai_provider === 'gemini') {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
                             badge.innerHTML = '<i class="fas fa-sparkles text-emerald-400"></i> Google Gemini Vision Aktif';
-                        } else if (s.ai_provider === 'openai' && s.has_openai_key) {
+                        } else if (s.ai_provider === 'openai') {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1';
                             badge.innerHTML = '<i class="fas fa-robot text-emerald-400"></i> OpenAI Vision Aktif';
                         } else {
                             badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 inline-flex items-center gap-1';
-                            badge.innerHTML = '<i class="fas fa-microchip text-cyan-400"></i> Local AI Vision Aktif';
+                            badge.innerHTML = '<i class="fas fa-file-code text-cyan-400"></i> AI via .env (Belum Diatur)';
                         }
                     }
-
-                    const keyInp = document.getElementById('aiApiKeyInput');
-                    if (keyInp) {
-                        keyInp.placeholder = s.has_gemini_key || s.has_openai_key
-                            ? 'API Key Tersimpan (' + (s.masked_gemini_key || s.masked_openai_key) + ')'
-                            : 'Tempel API Key Gemini / OpenAI...';
-                    }
-
-                    const hostEl = document.getElementById('serverHostDisplay');
-                    if (hostEl) hostEl.innerText = s.server_host || s.detected_host || '-';
                 }
             })
             .catch(err => console.error(err));
-    },
-
-    saveGeminiKey() {
-        const keyInp = document.getElementById('aiApiKeyInput');
-        const hostEl = document.getElementById('serverHostDisplay');
-
-        const payload = {
-            api_key: keyInp ? keyInp.value.trim() : '',
-            server_host: hostEl ? hostEl.innerText : ''
-        };
-
-        fetch('api/settings.php?action=save_settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                showToast(data.message, 'success');
-                this.loadSettings();
-                document.getElementById('settingsModal')?.classList.add('hidden');
-            } else {
-                showToast('Gagal menyimpan pengaturan', 'danger');
-            }
-        })
-        .catch(err => console.error(err));
     },
 
     clearAlerts() {

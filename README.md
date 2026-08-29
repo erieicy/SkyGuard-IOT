@@ -16,7 +16,7 @@
 2. **AI Vision: Matahari Alami vs Lampu Listrik**:
     - Ketika sensor LDR mendeteksi cahaya, modul ESP32-CAM mengambil citra.
     - Algoritma AI menganalisis spektrum pencahayaan untuk membedakan antara sinar matahari alami (membuka atap) dan cahaya lampu ruangan biasa (tetap menutup atap).
-    - **Mesin AI multi-provider**: *Local AI Vision Engine* (offline, tanpa API key), **Google Gemini Vision**, atau **OpenAI Vision**. Pilih di menu Pengaturan AI.
+    - **Mesin AI multi-provider**: *Local AI Vision Engine* (offline, tanpa API key), **Google Gemini Vision**, atau **OpenAI Vision**. Konfigurasi API key via file `.env` (prioritas utama) atau menu Pengaturan AI.
 3. **Deteksi Awan Mendung (*Overcast Protection*)**:
    - Pengguna atau ESP32-CAM dapat memotret kondisi awan langit.
    - Jika AI mendeteksi awan tebal mendung (*kumulonimbus/nimbostratus*), sistem memicu peringatan dini dan menutup atap jemuran secara otomatis.
@@ -104,6 +104,33 @@ c:/xampp/htdocs/SkyGuard-AI/
 
 ---
 
+## 🔑 Konfigurasi API AI Vision via `.env` (Rekomendasi)
+
+Kunci API AI disimpan di file `.env` di root proyek (sudah di-ignore oleh Git agar rahasia tidak ter-commit). Sistem akan **memprioritaskan `.env`** dibandingkan pengaturan di database.
+
+1. **Salin template** `.env.example` menjadi `.env` di root proyek:
+   ```bash
+   cp .env.example .env
+   ```
+2. **Isi nilai** pada `.env` sesuai provider yang dipilih:
+   ```ini
+   # Untuk Google Gemini (default)
+   AI_PROVIDER=gemini
+   AI_API_KEY=AIzaSy....          # Ganti dengan Google AI Studio API Key Anda
+   AI_MODEL=gemini-1.5-flash
+
+   # ATAU untuk OpenAI
+   # AI_PROVIDER=openai
+   # AI_API_KEY=sk-....            # Ganti dengan OpenAI API Key Anda
+   # AI_MODEL=gpt-4o-mini
+   ```
+3. **Buka dashboard** → menu *Pengaturan AI*. Di pojok kanan label akan menampilkan **Sumber: .env (Aktif)**, dan analisis foto langit akan langsung menggunakan AI API tersebut.
+4. **Fallback otomatis**: jika `AI_API_KEY` kosong/tidak valid, sistem otomatis kembali ke *Local AI Vision Engine* (offline, memanfaatkan ekstensi GD PHP).
+
+> 💡 Saat tombol *Auto-Close Mendung* aktif, foto langit yang diklasifikasikan sebagai **MENDUNG** oleh AI akan langsung memicu penutupan atap secara otomatis.
+
+---
+
 ## 🌐 Dokumentasi REST API
 
 | Method | Endpoint | Deskripsi |
@@ -111,8 +138,9 @@ c:/xampp/htdocs/SkyGuard-AI/
 | `GET` | `/api/status.php` | Mengambil status telemetri real-time, sisa timer, dan peringatan aktif. |
 | `POST` | `/api/control.php` | Mengirim perintah buka/tutup atap, switch mode (Auto/Manual/Timer), set durasi timer. |
 | `POST` | `/api/ai_analyze.php` | Menganalisis file citra/foto langit dan mengembalikan klasifikasi AI cuaca. |
-| `GET` | `/api/settings.php?action=get_settings` | Mengambil konfigurasi (provider AI terdeteksi, API key mask, alamat server/IP untuk ESP32). |
-| `POST` | `/api/settings.php?action=save_settings` | Menyimpan satu API key (otomatis deteksi Gemini/OpenAI) & alamat server. |
+| `GET` | `/api/settings.php?action=get_settings` | Mengambil konfigurasi (provider AI aktif dari .env, alamat server/IP untuk ESP32). |
+| `GET`/`POST` | `/api/history.php?action=delete_photo` | Menghapus satu riwayat foto berdasarkan `id` (beserta file gambarnya). |
+| `POST` | `/api/history.php?action=delete_all_photos` | Menghapus seluruh riwayat foto & file gambarnya. |
 | `GET` | `/api/esp32.php?action=get_command` | Digunakan ESP32 untuk polling posisi target servo/motor & melaporkan IP-nya. |
 | `POST` | `/api/esp32.php?action=update_sensors` | Digunakan ESP32 untuk mengirim nilai sensor air dan cahaya. |
 | `POST` | `/api/esp32.php?action=upload_cam` | Digunakan ESP32-CAM untuk mengunggah foto langit. |

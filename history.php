@@ -125,6 +125,10 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                     </h2>
                     <p class="text-xs text-slate-400">Riwayat tangkapan kamera beserta hasil evaluasi AI vision</p>
                 </div>
+
+                <button onclick="skyguardDeleteAllPhotos()" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-600 text-white shadow transition-all flex items-center gap-2">
+                    <i class="fas fa-trash-can"></i> Hapus Semua Foto
+                </button>
             </div>
 
             <?php if (empty($photos)): ?>
@@ -156,6 +160,10 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                                 <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-black/70 text-slate-300 backdrop-blur-md">
                                     Akurasi: <?= round($p['ai_confidence'], 1) ?>%
                                 </div>
+                                <button onclick="skyguardDeletePhoto(<?= (int)$p['id'] ?>)" title="Hapus foto ini"
+                                    class="absolute top-2 right-2 w-7 h-7 rounded-lg bg-rose-600/85 hover:bg-rose-600 text-white text-xs flex items-center justify-center backdrop-blur-md shadow transition-all">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
 
                             <div class="p-4 space-y-2">
@@ -262,6 +270,35 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
             <span>Riwayat AI</span>
         </a>
     </div>
+
+    <!-- Skrip penghapusan riwayat foto -->
+    <script>
+        function skyguardDeletePhoto(id) {
+            if (!confirm('Hapus foto riwayat ini beserta file gambarnya?')) return;
+            fetch('api/history.php?action=delete_photo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) { location.reload(); }
+                else { alert(d.error || 'Gagal menghapus foto.'); }
+            })
+            .catch(e => alert('Gagal berkomunikasi dengan server.'));
+        }
+
+        function skyguardDeleteAllPhotos() {
+            if (!confirm('Hapus SELURUH riwayat foto? Tindakan ini tidak dapat dibatalkan.')) return;
+            fetch('api/history.php?action=delete_all_photos', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) { location.reload(); }
+                else { alert(d.error || 'Gagal menghapus foto.'); }
+            })
+            .catch(e => alert('Gagal berkomunikasi dengan server.'));
+        }
+    </script>
 
 </body>
 </html>

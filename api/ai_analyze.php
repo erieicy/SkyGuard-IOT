@@ -1,7 +1,7 @@
-<?php
+﻿<?php
 /**
  * SkyGuard AI - Computer Vision & Weather Analysis Engine
- * Powered by Google Gemini AI Vision API & Local Computer Vision Fallback
+ * Powered by Google Gemini / OpenAI AI Vision API (konfigurasi via file .env)
  * 1. Differentiates Natural Sunlight vs Artificial Indoor Lamp
  * 2. Classifies Weather & Cloud State (Cerah, Berawan, Mendung, Hujan, Malam)
  * 3. Recommends drying durations
@@ -167,8 +167,8 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
 
     // Insert camera history record
     $hist = $pdo->prepare("
-        INSERT INTO camera_history (image_path, source, ai_classification, ai_confidence, light_detected, roof_action, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO camera_history (timestamp, image_path, source, ai_classification, ai_confidence, light_detected, roof_action, notes)
+        VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
     ");
     $relativePath = 'uploads/' . $savedFilename;
     $hist->execute([
@@ -184,20 +184,20 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     // Create system alert if Mendung / Hujan / Lamp
     if ($weatherVerdict === 'MENDUNG') {
         $alert = $pdo->prepare("
-            INSERT INTO alerts (alert_type, title, message, severity)
-            VALUES ('MENDUNG_ALERT', 'Peringatan Awan Mendung!', 'Kamera ESP32 & AI mendeteksi awan mendung gelap. ' || ?, 'warning')
+            INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+            VALUES (datetime('now', 'localtime'), 'MENDUNG_ALERT', 'Peringatan Awan Mendung!', 'Kamera ESP32 & AI mendeteksi awan mendung gelap. ' || ?, 'warning')
         ");
         $alert->execute([$state['control_mode'] === 'AUTO' ? 'Atap jemuran ditutup otomatis.' : 'Harap segera tutup jemuran secara manual!']);
     } elseif ($weatherVerdict === 'HUJAN') {
         $alert = $pdo->prepare("
-            INSERT INTO alerts (alert_type, title, message, severity)
-            VALUES ('RAIN_DETECTED', 'Peringatan Hujan!', 'Kamera AI mendeteksi curah hujan aktif. Atap diamankan tertutup.', 'danger')
+            INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+            VALUES (datetime('now', 'localtime'), 'RAIN_DETECTED', 'Peringatan Hujan!', 'Kamera AI mendeteksi curah hujan aktif. Atap diamankan tertutup.', 'danger')
         ");
         $alert->execute();
     } elseif ($lightVerdict === 'ARTIFICIAL_LAMP') {
         $alert = $pdo->prepare("
-            INSERT INTO alerts (alert_type, title, message, severity)
-            VALUES ('LAMP_DETECTED', 'Deteksi Lampu Ruangan', 'Sensor mendeteksi cahaya, namun AI Vision mengonfirmasi ini adalah cahaya lampu listrik/ruangan, bukan matahari.', 'info')
+            INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+            VALUES (datetime('now', 'localtime'), 'LAMP_DETECTED', 'Deteksi Lampu Ruangan', 'Sensor mendeteksi cahaya, namun AI Vision mengonfirmasi ini adalah cahaya lampu listrik/ruangan, bukan matahari.', 'info')
         ");
         $alert->execute();
     }
@@ -221,9 +221,36 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
 }
 
 /**
- * Ambil konfigurasi AI dari settings: provider, gemini key, openai key, model
+ * Ambil konfigurasi AI Vision.
+ * Prioritas: file .env (AI_PROVIDER / AI_API_KEY / AI_MODEL) -> lalu database settings.
  */
 function getAIConfig($pdo) {
+    // 1. Coba dari .env (sumber utama, agar key tidak perlu disimpan di DB)
+    $envProvider = strtolower(trim((string)($_ENV['AI_PROVIDER'] ?? getenv('AI_PROVIDER') ?? '')));
+    $envKey      = trim((string)($_ENV['AI_API_KEY']   ?? getenv('AI_API_KEY')   ?? ''));
+    $envModel    = trim((string)($_ENV['AI_MODEL']    ?? getenv('AI_MODEL')    ?? ''));
+
+    if ($envProvider !== '' && $envKey !== '') {
+        if ($envProvider === 'gemini') {
+            return [
+                'provider'   => 'gemini',
+                'gemini_key' => $envKey,
+                'openai_key' => null,
+                'model'      => $envModel ?: 'gemini-1.5-flash',
+                'source'     => 'env'
+            ];
+        } elseif ($envProvider === 'openai') {
+            return [
+                'provider'   => 'openai',
+                'gemini_key' => null,
+                'openai_key' => $envKey,
+                'model'      => $envModel ?: 'gpt-4o-mini',
+                'source'     => 'env'
+            ];
+        }
+    }
+
+    // 2. Fallback ke database settings (jika .env tidak dikonfigurasi)
     try {
         $rows = $pdo->query("SELECT key, value FROM settings WHERE key IN ('ai_provider','gemini_api_key','openai_api_key','ai_model')")->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (Exception $e) {
@@ -233,7 +260,8 @@ function getAIConfig($pdo) {
         'provider'    => strtolower($rows['ai_provider'] ?? 'local'),
         'gemini_key'  => !empty($rows['gemini_api_key']) ? trim($rows['gemini_api_key']) : null,
         'openai_key'  => !empty($rows['openai_api_key']) ? trim($rows['openai_api_key']) : null,
-        'model'       => !empty($rows['ai_model']) ? trim($rows['ai_model']) : ''
+        'model'       => !empty($rows['ai_model']) ? trim($rows['ai_model']) : '',
+        'source'      => 'db'
     ];
 }
 
@@ -247,15 +275,16 @@ function isValidImageFile($filePath) {
 }
 
 /**
- * Main AI Analyzer: dispatch ke provider (Gemini / OpenAI) dengan fallback lokal
- * Selalu mengembalikan array yang valid; jika gagal, kembalikan error yang ramah pengguna.
+ * Main AI Analyzer: memanggil API AI Vision (Gemini / OpenAI) secara langsung.
+ * Jika gagal (tidak ada key, koneksi error, dsb) -> kembalikan status "Gagal mendeteksi".
+ * Tidak ada fallback lokal: analisis 100% bergantung pada AI API (.env).
  */
 function analyzeSkyWithAI($filePath, $aiConfig = []) {
     // Validasi file gambar terlebih dahulu
     if (!isValidImageFile($filePath)) {
         return [
-            'weather' => 'CERAH',
-            'light_verdict' => 'SUNLIGHT',
+            'weather' => 'ERROR',
+            'light_verdict' => 'UNKNOWN',
             'confidence' => 0.0,
             'recommended_minutes' => 0,
             'recommendation' => 'Gagal membaca gambar: file tidak valid atau rusak.',
@@ -275,7 +304,7 @@ function analyzeSkyWithAI($filePath, $aiConfig = []) {
             $res['engine'] = 'Google Gemini Vision AI';
             return $res;
         }
-        $lastError = 'Gemini API gagal.';
+        $lastError = 'Gemini API gagal merespons (periksa koneksi / API key .env).';
     }
 
     // 2. OpenAI Vision API
@@ -285,13 +314,21 @@ function analyzeSkyWithAI($filePath, $aiConfig = []) {
             $res['engine'] = 'OpenAI Vision API';
             return $res;
         }
-        $lastError = 'OpenAI API gagal.';
+        $lastError = 'OpenAI API gagal merespons (periksa koneksi / API key .env).';
     }
 
-    // 3. Fallback Local Computer Vision Image Analysis
-    $localResult = analyzeSkyImageLocal($filePath);
-    $localResult['engine'] = 'Local AI Vision Engine';
-    return $localResult;
+    // 3. Tidak ada provider AI yang valid / API gagal -> laporkan GAGAL MENDETEKSI
+    $errMsg = $lastError ?: 'Tidak ada API AI yang dikonfigurasi. Isi file .env (AI_PROVIDER & AI_API_KEY).';
+    return [
+        'weather' => 'ERROR',
+        'light_verdict' => 'UNKNOWN',
+        'confidence' => 0.0,
+        'recommended_minutes' => 0,
+        'recommendation' => 'Gagal mendeteksi kondisi langit. ' . $errMsg,
+        'details' => $errMsg,
+        'error' => 'Gagal mendeteksi: ' . $errMsg,
+        'engine' => 'AI API (gagal)'
+    ];
 }
 
 /**
@@ -302,20 +339,26 @@ function skyGuardVisionPrompt() {
 Analyze this photo taken by the ESP32-CAM module facing upwards/outdoors.
 Task:
 1. Identify if the light source is Natural Daylight/Sunlight ('SUNLIGHT'), Artificial Indoor Room Lamp/Bulb ('ARTIFICIAL_LAMP'), or Night/Dark ('DARK').
-2. Classify the sky condition: 'CERAH' (sunny/clear), 'BERAWAN' (partly cloudy), 'MENDUNG' (dark overcast threatening rain), 'HUJAN' (raining), or 'MALAM' (night).
+2. Classify the sky condition: 'CERAH' (sunny/clear, blue sky dominant), 'BERAWAN' (partly cloudy, some clouds but sunlight still visible), 'MENDUNG' (dark gray overcast threatening rain), 'HUJAN' (raining), or 'MALAM' (night/dark).
 3. Determine recommended roof action: 'OPEN' (if sunlight and good weather) or 'CLOSED' (if overcast mendung, rain, night, or lamp).
 4. Suggest drying duration in minutes (integer between 0 and 180).
 5. Give a concise explanation in Indonesian.
+
+IMPORTANT for realistic accuracy:
+- Do NOT return a fixed/round confidence like 90.0 or 95.0. Estimate confidence precisely from actual image evidence (e.g. 87.3, 91.6, 78.4).
+- If the sky is partially cloudy, set 'weather' to 'BERAWAN' and lower confidence accordingly (clouds reduce certainty of good drying).
+- If sky is gray and overcast, use 'MENDUNG'.
+- The 'confidence' must reflect how certain you are; clearer skies with strong sunlight = higher confidence (90-99), ambiguous/mixed = lower (70-89).
 
 Respond ONLY with a valid JSON object matching this exact schema:
 {
   \"weather\": \"CERAH\",
   \"light_verdict\": \"SUNLIGHT\",
-  \"confidence\": 96.5,
+  \"confidence\": 94.7,
   \"roof_action\": \"OPEN\",
   \"recommended_minutes\": 45,
   \"recommendation\": \"Sinar matahari cerah optimal. Rekomendasi jemur: 45 menit.\",
-  \"details\": \"Analisis spektrum cahaya alami menunjukkan langit cerah dengan luminansi matahari tinggi.\"
+  \"details\": \"Langit biru cerah, luminansi matahari tinggi, tidak ada awan signifikan.\"
 }";
 }
 
@@ -394,7 +437,7 @@ function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini-1.5-flash') {
         }
     }
 
-    return null; // Fallback to local CV
+    return null; // API gagal -> analyzeSkyWithAI akan mengembalikan "Gagal mendeteksi"
 }
 
 /**
@@ -475,94 +518,5 @@ function callOpenAIVisionAPI($filePath, $apiKey, $model = 'gpt-4o-mini') {
         }
     }
 
-    return null; // Fallback to local CV
+    return null; // API gagal -> analyzeSkyWithAI akan mengembalikan "Gagal mendeteksi"
 }
-
-/**
- * Local Computer Vision Image Analysis (RGB Balance & Luminance Spectrum)
- */
-function analyzeSkyImageLocal($filePath) {
-    if (extension_loaded('gd') && file_exists($filePath)) {
-        $imgInfo = @getimagesize($filePath);
-        if ($imgInfo) {
-            $img = null;
-            if ($imgInfo[2] == IMAGETYPE_JPEG) $img = @imagecreatefromjpeg($filePath);
-            elseif ($imgInfo[2] == IMAGETYPE_PNG) $img = @imagecreatefrompng($filePath);
-
-            if ($img) {
-                $w = imagesx($img);
-                $h = imagesy($img);
-                
-                $totalR = 0; $totalG = 0; $totalB = 0;
-                $sampleCount = 0;
-                
-                for ($x = 0; $x < $w; $x += max(1, (int)($w / 20))) {
-                    for ($y = 0; $y < $h; $y += max(1, (int)($h / 20))) {
-                        $rgb = imagecolorat($img, $x, $y);
-                        $r = ($rgb >> 16) & 0xFF;
-                        $g = ($rgb >> 8) & 0xFF;
-                        $b = $rgb & 0xFF;
-                        $totalR += $r;
-                        $totalG += $g;
-                        $totalB += $b;
-                        $sampleCount++;
-                    }
-                }
-                imagedestroy($img);
-
-                $avgR = $totalR / max(1, $sampleCount);
-                $avgG = $totalG / max(1, $sampleCount);
-                $avgB = $totalB / max(1, $sampleCount);
-                $brightness = (0.299 * $avgR + 0.587 * $avgG + 0.114 * $avgB);
-
-                if ($brightness < 35) {
-                    return [
-                        'weather' => 'MALAM',
-                        'light_verdict' => 'DARK',
-                        'confidence' => 95.0,
-                        'recommended_minutes' => 0,
-                        'recommendation' => 'Kondisi gelap / malam hari. Atap tetap tertutup.',
-                        'details' => sprintf('Luminansi rendah (%.1f Lux equiv). Tidak ada sinar matahari.', $brightness)
-                    ];
-                } elseif ($avgR > 175 && $avgG > 150 && $avgB < 110) {
-                    return [
-                        'weather' => 'INDOOR',
-                        'light_verdict' => 'ARTIFICIAL_LAMP',
-                        'confidence' => 92.5,
-                        'recommended_minutes' => 0,
-                        'recommendation' => 'Cahaya terdeteksi dari lampu ruangan listrik, bukan sinar matahari.',
-                        'details' => sprintf('Dominasi spektrum kuning lampu (R:%.0f, G:%.0f, B:%.0f).', $avgR, $avgG, $avgB)
-                    ];
-                } elseif (abs($avgR - $avgG) < 22 && abs($avgG - $avgB) < 22 && $brightness < 165) {
-                    return [
-                        'weather' => 'MENDUNG',
-                        'light_verdict' => 'SUNLIGHT',
-                        'confidence' => 93.0,
-                        'recommended_minutes' => 0,
-                        'recommendation' => 'Awan tebal mendung terdeteksi. Waspada hujan turun, atap diamankan tertutup.',
-                        'details' => sprintf('Awan kelabu mendung merata (Luminansi: %.1f).', $brightness)
-                    ];
-                } else {
-                    $drying = ($brightness > 180) ? 45 : 60;
-                    return [
-                        'weather' => ($brightness > 160 ? 'CERAH' : 'BERAWAN'),
-                        'light_verdict' => 'SUNLIGHT',
-                        'confidence' => 96.0,
-                        'recommended_minutes' => $drying,
-                        'recommendation' => "Sinar matahari alami terdeteksi optimal. Rekomendasi jemur: {$drying} menit.",
-                        'details' => sprintf('Spektrum cahaya alami outdoor terdeteksi (Luminansi: %.1f).', $brightness)
-                    ];
-                }
-            }
-        }
-    }
-
-    return [
-        'weather' => 'CERAH',
-        'light_verdict' => 'SUNLIGHT',
-        'confidence' => 90.0,
-        'recommended_minutes' => 60,
-        'recommendation' => 'Sinar matahari terdeteksi. Rekomendasi jemur: 60 menit.',
-        'details' => 'Analisis citra AI mengonfirmasi pencahayaan sinar matahari.'
-    ];
-}

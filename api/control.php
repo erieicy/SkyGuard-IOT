@@ -61,8 +61,8 @@ switch ($action) {
 
         // Insert sensor log
         $log = $pdo->prepare("
-            INSERT INTO sensor_logs (rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
+            VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
         ");
         $log->execute([$state['rain_detected'], $state['light_level'], $newStatus, $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict'], 'MANUAL_OVERRIDE']);
 
@@ -143,8 +143,8 @@ switch ($action) {
 
         // Alert
         $alert = $pdo->prepare("
-            INSERT INTO alerts (alert_type, title, message, severity)
-            VALUES ('TIMER_SET', 'Timer Jemur Aktif', 'Stopwatch timer diatur untuk {$minutes} menit. Atap jemuran dibuka dan akan tertutup otomatis pada {$endTime}.', 'info')
+            INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+            VALUES (datetime('now', 'localtime'), 'TIMER_SET', 'Timer Jemur Aktif', 'Stopwatch timer diatur untuk {$minutes} menit. Atap jemuran dibuka dan akan tertutup otomatis pada {$endTime}.', 'info')
         ");
         $alert->execute();
 
@@ -249,8 +249,8 @@ function evaluateAutoLogic($pdo) {
         $update->execute([$newRoofStatus, $reason]);
 
         $log = $pdo->prepare("
-            INSERT INTO sensor_logs (rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
-            VALUES (?, ?, ?, 'AUTO', ?, ?, 'AUTO_EVALUATION')
+            INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
+            VALUES (datetime('now', 'localtime'), ?, ?, ?, 'AUTO', ?, ?, 'AUTO_EVALUATION')
         ");
         $log->execute([$state['rain_detected'], $state['light_level'], $newRoofStatus, $state['ai_weather_verdict'], $state['ai_light_verdict']]);
     }

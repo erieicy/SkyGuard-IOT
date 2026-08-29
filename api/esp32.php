@@ -23,7 +23,7 @@ $action = $_GET['action'] ?? $_POST['action'] ?? 'get_command';
 if ($action === 'get_command' || ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
     // Update heartbeat (UTC agar konsisten dengan pengecekan status.php)
     $espIp = $_SERVER['REMOTE_ADDR'] ?? null;
-    $pdo->prepare("UPDATE device_state SET esp32_last_seen = datetime('now'), esp32_ip = ? WHERE id = 1")
+    $pdo->prepare("UPDATE device_state SET esp32_last_seen = datetime('now', 'localtime'), esp32_ip = ? WHERE id = 1")
         ->execute([$espIp]);
 
     $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
@@ -84,8 +84,8 @@ if ($action === 'connect') {
         exit;
     }
 
-    // Simpan IP & tandai ESP32 sebagai terhubung (perbarui esp32_last_seen ke UTC sekarang)
-    $pdo->prepare("UPDATE device_state SET esp32_ip = ?, esp32_last_seen = datetime('now') WHERE id = 1")
+    // Simpan IP & tandai ESP32 sebagai terhubung (perbarui esp32_last_seen ke waktu lokal sekarang)
+    $pdo->prepare("UPDATE device_state SET esp32_ip = ?, esp32_last_seen = datetime('now', 'localtime') WHERE id = 1")
         ->execute([$ip]);
 
     // Ping ESP32 untuk memverifikasi bahwa perangkat benar-benar dapat dijangkau.
@@ -142,8 +142,8 @@ if ($action === 'update_sensors') {
 
             // Insert alert
             $alert = $pdo->prepare("
-                INSERT INTO alerts (alert_type, title, message, severity)
-                VALUES ('RAIN_DETECTED', 'Hujan Terdeteksi!', 'Sensor mendeteksi tetesan air hujan. Atap jemuran segera diamankan tertutup.', 'danger')
+                INSERT INTO alerts (timestamp, alert_type, title, message, severity)
+                VALUES (datetime('now', 'localtime'), 'RAIN_DETECTED', 'Hujan Terdeteksi!', 'Sensor mendeteksi tetesan air hujan. Atap jemuran segera diamankan tertutup.', 'danger')
             ");
             $alert->execute();
         }
@@ -159,7 +159,7 @@ if ($action === 'update_sensors') {
             light_level = ?,
             roof_status = ?,
             last_action_reason = ?,
-            esp32_last_seen = datetime('now'),
+            esp32_last_seen = datetime('now', 'localtime'),
             updated_at = datetime('now', 'localtime')
         WHERE id = 1
     ");
@@ -168,8 +168,8 @@ if ($action === 'update_sensors') {
     // Periodically insert telemetry log (or on state change)
     if ($actionTriggered !== null || rand(1, 10) === 1) {
         $log = $pdo->prepare("
-            INSERT INTO sensor_logs (rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
+            VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
         ");
         $log->execute([$rain, $light, $newRoofStatus, $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict'], $actionTriggered]);
     }

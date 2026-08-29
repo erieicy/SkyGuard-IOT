@@ -4,9 +4,55 @@
  * Uses SQLite for zero-configuration, seamless deployment in XAMPP.
  */
 
+// Gunakan zona waktu lokal (WIB) agar semua waktu (jam server & penyimpanan)
+// sesuai dengan dunia nyata / jam pengguna.
+date_default_timezone_set('Asia/Jakarta');
+
 define('DB_DIR', __DIR__ . '/../data');
 define('DB_FILE', DB_DIR . '/skyguard.db');
 define('UPLOAD_DIR', __DIR__ . '/../uploads');
+
+/**
+ * Muat variabel lingkungan dari file .env (jika ada).
+ * Diprioritaskan untuk konfigurasi API AI Vision:
+ *   AI_PROVIDER = gemini | openai
+ *   AI_API_KEY  = key API (Gemini atau OpenAI)
+ *   AI_MODEL    = nama model (opsional)
+ */
+function loadEnvFile($path) {
+    if (!file_exists($path)) {
+        return false;
+    }
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return false;
+    }
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+        list($key, $value) = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        $value = trim($value, "\"'"); // buang tanda kutip jika ada
+        if ($key === '') {
+            continue;
+        }
+        // Jangan timpa nilai yang sudah ada di environment sistem
+        if (!isset($_ENV[$key]) && getenv($key) === false) {
+            $_ENV[$key] = $value;
+            @putenv("$key=$value");
+        }
+    }
+    return true;
+}
+
+// Muat .env dari root project (satu level di atas folder api/)
+loadEnvFile(__DIR__ . '/../.env');
 
 // Ensure directories exist
 if (!file_exists(DB_DIR)) {
@@ -55,7 +101,7 @@ function initializeDatabase($pdo) {
             esp32_last_seen TEXT DEFAULT NULL,
             esp32_cam_last_seen TEXT DEFAULT NULL,
             last_action_reason TEXT DEFAULT 'System Initialized',
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         )
     ");
 
@@ -82,7 +128,7 @@ function initializeDatabase($pdo) {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS sensor_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
             rain_detected INTEGER NOT NULL,
             light_level INTEGER NOT NULL,
             roof_status TEXT NOT NULL,
@@ -97,7 +143,7 @@ function initializeDatabase($pdo) {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS camera_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
             image_path TEXT NOT NULL,
             source TEXT DEFAULT 'esp32_cam', -- esp32_cam, direct_camera, user_upload
             ai_classification TEXT NOT NULL, -- SUNLIGHT, LAMP_INDOOR, CERAH, MENDUNG, HUJAN, MALAM
@@ -112,7 +158,7 @@ function initializeDatabase($pdo) {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
             alert_type TEXT NOT NULL, -- RAIN_DETECTED, MENDUNG_ALERT, TIMER_EXPIRED, LAMP_DETECTED, SYSTEM
             title TEXT NOT NULL,
             message TEXT NOT NULL,
@@ -159,5 +205,20 @@ function initializeDatabase($pdo) {
         $pdo->exec("ALTER TABLE device_state ADD COLUMN esp32_ip TEXT DEFAULT NULL");
     } catch (Exception $e) {
         // Kolom sudah ada
+    }
+
+    // Migrasi satu kali: ubah timestamp UTC (dari CURRENT_TIMESTAMP lama) ke waktu lokal (WIB)
+    // agar seluruh riwayat & log sesuai dengan jam dunia nyata.
+    $tzMigrated = $pdo->query("SELECT value FROM settings WHERE key = 'tz_migrated'")->fetchColumn();
+    if ($tzMigrated !== '1') {
+        $offset = (int)date('Z'); // offset zona waktu lokal dalam detik
+        if ($offset != 0) {
+            $mod = ($offset >= 0 ? '+' : '-') . abs($offset) . ' seconds';
+            foreach (['camera_history', 'sensor_logs', 'alerts'] as $tbl) {
+                $pdo->exec("UPDATE $tbl SET timestamp = strftime('%Y-%m-%d %H:%M:%S', timestamp, '$mod') WHERE timestamp IS NOT NULL AND timestamp <> ''");
+            }
+            $pdo->exec("UPDATE device_state SET esp32_last_seen = strftime('%Y-%m-%d %H:%M:%S', esp32_last_seen, '$mod') WHERE esp32_last_seen IS NOT NULL AND esp32_last_seen <> ''");
+        }
+        $pdo->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('tz_migrated', '1')")->execute();
     }
 }
