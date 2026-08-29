@@ -552,6 +552,23 @@ const App = {
 
         showToast('🔗 Menghubungkan ESP32 (' + ip + ') ke dashboard...', 'info');
 
+        const btn = document.getElementById('btnConnectEsp32');
+        const origHTML = btn ? btn.innerHTML : '';
+        const origClass = btn ? btn.className : '';
+        const setConnecting = () => {
+            if (!btn) return;
+            btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-white border border-yellow-500/40 shadow flex items-center gap-1.5 transition-all opacity-90 cursor-wait';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span class="hidden sm:inline">Menghubungkan...</span>';
+            btn.disabled = true;
+        };
+        const restoreBtn = () => {
+            if (!btn) return;
+            btn.className = origClass;
+            btn.innerHTML = origHTML;
+            btn.disabled = false;
+        };
+        setConnecting();
+
         fetch('api/esp32.php?action=connect', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -559,18 +576,19 @@ const App = {
         })
         .then(res => res.json())
         .then(data => {
+            restoreBtn();
             if (data.success) {
                 AudioAlerts.playSuccessTone();
-                const statusMsg = data.reachable
-                    ? 'ESP32 terjangkau & terhubung!'
-                    : 'ESP32 dicatat sebagai terhubung (pastikan firmware mempolling server).';
-                showToast(data.message + ' — ' + statusMsg, 'success');
+                showToast(data.message + ' — ESP32 terhubung!', 'success');
                 this.fetchStatus();
             } else {
+                // Tidak menghidupkan sistem karena belum benar-benar terhubung.
                 showToast(data.error || 'Gagal menghubungkan ESP32', 'danger');
+                this.fetchStatus();
             }
         })
         .catch(err => {
+            restoreBtn();
             console.error('Connect ESP32 error:', err);
             showToast('Gagal mengirim perintah koneksi ke server', 'danger');
         });

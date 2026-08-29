@@ -272,9 +272,6 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         <a href="index.php">
             <i class="fas fa-gauge-high"></i> Dashboard
         </a>
-        <a href="index.php" class="desktop-snap-btn-center" title="Foto Langsung">
-            <i class="fas fa-camera"></i>
-        </a>
         <a href="history.php" class="active">
             <i class="fas fa-images"></i> Riwayat AI
         </a>

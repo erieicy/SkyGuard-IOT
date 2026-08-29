@@ -58,12 +58,12 @@
         <div class="flex items-center gap-3">
             <div class="flex items-center gap-2">
                 <input id="espIpInput" type="text" placeholder="IP ESP32 (WiFi)" class="w-32 sm:w-40 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500" />
-                <button onclick="App.connectEsp32()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-500/40 shadow flex items-center gap-1.5 transition-all">
+                <button id="btnConnectEsp32" onclick="App.connectEsp32()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-500/40 shadow flex items-center gap-1.5 transition-all">
                     <i class="fas fa-link"></i> <span class="hidden sm:inline">Hubungkan</span>
                 </button>
                 <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all" onclick="App.fetchStatus()">
                     <span id="espStatusDot" class="pulse-dot offline"></span>
-                    <span id="espStatusText" class="text-xs font-semibold text-rose-400">ESP32 STANDBY</span>
+                    <span id="espStatusText" class="text-xs font-semibold text-rose-400">TERPUTUS</span>
                 </div>
             </div>
         </div>
@@ -550,9 +550,6 @@
     <div class="desktop-bottom-nav">
         <a href="index.php" class="active">
             <i class="fas fa-gauge-high"></i> Dashboard
-        </a>
-        <a href="index.php" class="desktop-snap-btn-center" title="Foto Langsung">
-            <i class="fas fa-camera"></i>
         </a>
         <a href="history.php">
             <i class="fas fa-images"></i> Riwayat AI
