@@ -296,9 +296,9 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
 
     <!-- Modal Detail Foto (Lihat Selengkapnya) -->
     <div id="photoDetailModal"
-        class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        class="fixed inset-0 z-[2000] hidden items-center justify-center p-4 pt-20 pb-24 sm:p-6 sm:pt-6 sm:pb-6 bg-black/70 backdrop-blur-sm"
         onclick="if(event.target===this) skyguardClosePhotoDetail()">
-        <div class="glass-panel w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 shadow-2xl">
+        <div class="glass-panel w-full max-w-lg max-h-[calc(100vh-12rem)] sm:max-h-[88vh] overflow-y-auto rounded-2xl border border-slate-700 shadow-2xl">
             <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur z-10">
                 <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
                     <i class="fas fa-camera-retro text-cyan-400"></i> Detail Analisis Foto
