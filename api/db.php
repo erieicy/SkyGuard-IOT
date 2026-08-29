@@ -91,6 +91,20 @@ function getDbConnection() {
  * @param string $source  Pemicu: 'MANUAL_OVERRIDE', 'AI_VISION', 'TIMER', 'AUTO_LOGIC', dll
  * @return array ['success'=>bool, 'roof_status'=>?string, 'error'=>?string]
  */
+
+/**
+ * Batasi jumlah baris pada tabel riwayat agar hanya menyimpan $limit data terbaru.
+ * Menghapus baris terlama (id terkecil) yang melebihi batas.
+ */
+function enforceRetention($pdo, $limit = 10) {
+    foreach (['camera_history', 'sensor_logs'] as $table) {
+        $count = $pdo->query("SELECT COUNT(*) FROM `$table`")->fetchColumn();
+        if ($count > $limit) {
+            $pdo->exec("DELETE FROM `$table` WHERE id NOT IN (SELECT id FROM `$table` ORDER BY id DESC LIMIT $limit)");
+        }
+    }
+}
+
 function applyRoofCommand($pdo, $status, $reason, $source = 'MANUAL_OVERRIDE') {
     $status = strtoupper(trim($status));
     if (!in_array($status, ['OPEN', 'CLOSED'])) {
@@ -128,6 +142,8 @@ function applyRoofCommand($pdo, $status, $reason, $source = 'MANUAL_OVERRIDE') {
         $info['ai_light_verdict'] ?? 'SUNLIGHT',
         $source
     ]);
+
+    enforceRetention($pdo, 10);
 
     return ['success' => true, 'roof_status' => $status];
 }

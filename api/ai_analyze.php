@@ -194,6 +194,8 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
         $recommendation . ' [' . $aiEngineUsed . ']'
     ]);
 
+    enforceRetention($pdo, 10);
+
     // Create system alert if Mendung / Hujan / Lamp
     if ($weatherVerdict === 'MENDUNG') {
         $alert = $pdo->prepare("

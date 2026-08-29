@@ -5,12 +5,15 @@
 require_once __DIR__ . '/api/db.php';
 $pdo = getDbConnection();
 
+// Batasi riwayat foto & log hanya 10 entri terbaru (hapus sisanya)
+enforceRetention($pdo, 10);
+
 // Fetch Photo History
-$photosStmt = $pdo->query("SELECT * FROM camera_history ORDER BY id DESC LIMIT 60");
+$photosStmt = $pdo->query("SELECT * FROM camera_history ORDER BY id DESC LIMIT 10");
 $photos = $photosStmt->fetchAll();
 
 // Fetch Sensor History Logs
-$logsStmt = $pdo->query("SELECT * FROM sensor_logs ORDER BY id DESC LIMIT 50");
+$logsStmt = $pdo->query("SELECT * FROM sensor_logs ORDER BY id DESC LIMIT 10");
 $logs = $logsStmt->fetchAll();
 
 // Stats
@@ -128,7 +131,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                     <p class="text-xs text-slate-600 mt-1">Foto akan muncul otomatis saat ESP32-CAM mengirimkan tangkapan cuaca.</p>
                 </div>
             <?php else: ?>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <?php foreach ($photos as $p): ?>
                         <?php
                             $badgeColor = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
@@ -152,7 +155,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                             $photoModalAttr = htmlspecialchars(json_encode($photoModalData), ENT_QUOTES, 'UTF-8');
                         ?>
                         <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden hover:border-cyan-500/40 transition-all group flex flex-col justify-between">
-                            <div class="relative h-44 bg-slate-950 overflow-hidden">
+                            <div class="relative h-32 sm:h-44 bg-slate-950 overflow-hidden">
                                 <img src="<?= htmlspecialchars($p['image_path']) ?>" onerror="this.src='https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=640&auto=format&fit=crop&q=60'" alt="Weather Photo" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-300">
                                 
                                 <div class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold border backdrop-blur-md <?= $badgeColor ?>">

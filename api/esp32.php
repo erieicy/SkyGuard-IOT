@@ -215,6 +215,7 @@ if ($action === 'update_sensors') {
             VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
         ");
         $log->execute([$rain, $light, $newRoofStatus, $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict'], $actionTriggered]);
+        enforceRetention($pdo, 10);
     }
 
     $servoAngle = ($newRoofStatus === 'OPEN') ? 180 : 0;

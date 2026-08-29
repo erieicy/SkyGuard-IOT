@@ -49,6 +49,7 @@ function checkTimerExpiration($pdo, &$state) {
                 VALUES (datetime('now', 'localtime'), ?, ?, 'CLOSED', ?, ?, ?, 'TIMER_AUTO_CLOSE')
             ");
             $log->execute([$state['rain_detected'], $state['light_level'], $state['control_mode'], $state['ai_weather_verdict'], $state['ai_light_verdict']]);
+            enforceRetention($pdo, 10);
 
             // Refresh state array
             $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");

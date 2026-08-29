@@ -235,5 +235,6 @@ function evaluateAutoLogic($pdo) {
             VALUES (datetime('now', 'localtime'), ?, ?, ?, 'AUTO', ?, ?, 'AUTO_EVALUATION')
         ");
         $log->execute([$state['rain_detected'], $state['light_level'], $newRoofStatus, $state['ai_weather_verdict'], $state['ai_light_verdict']]);
+        enforceRetention($pdo, 10);
     }
 }
