@@ -418,7 +418,7 @@
                     </div>
 
                     <!-- Alerts Feed List -->
-                    <div id="alertsListContainer" class="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    <div id="alertsListContainer" class="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                         <div class="text-center py-6 text-slate-500 text-xs">
                             <i class="fas fa-spinner fa-spin mb-2"></i>
                             <p>Memuat notifikasi...</p>
