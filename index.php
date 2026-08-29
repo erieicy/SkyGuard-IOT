@@ -328,6 +328,7 @@
                         <input id="customTimerInput" type="number" placeholder="Menit..." min="1" max="720" value="45" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-violet-500">
                         <button onclick="App.startTimer()" class="px-3 py-1 text-xs font-bold rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow transition-all">Mulai</button>
                     </div>
+                    <p id="timerOfflineHint" style="display: none;" class="text-[10px] text-rose-300 mt-2 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengatur Stopwatch Jemur.</p>
                 </div>
 
                 <p class="text-[11px] text-slate-400">Tutup atap otomatis saat timer habis</p>
@@ -564,6 +565,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/app.js?v=20260830t3"></script>
 </body>
 </html>

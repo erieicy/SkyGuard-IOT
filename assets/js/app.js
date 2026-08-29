@@ -239,11 +239,14 @@ const App = {
 
         // 11. Jika ESP32 PUTUS -> kosongkan semua data tampilan (seperti belum diisi)
         if (!s.esp32_online) {
-            if (roofBadge) {
-                roofBadge.className = 'badge-status badge-status-closed';
-                roofBadge.innerHTML = '<i class="fas fa-plug-circle-xmark"></i> MENUNGGU ESP32';
+            // Jangan sembunyikan status atap jika timer jemur sedang aktif
+            if (!s.timer_active) {
+                if (roofBadge) {
+                    roofBadge.className = 'badge-status badge-status-closed';
+                    roofBadge.innerHTML = '<i class="fas fa-plug-circle-xmark"></i> MENUNGGU ESP32';
+                }
+                if (roofStructure) roofStructure.className = 'clothesline-structure roof-state-closed';
             }
-            if (roofStructure) roofStructure.className = 'clothesline-structure roof-state-closed';
 
             const rainValBadge = document.getElementById('rainSensorVal');
             if (rainValBadge) {
@@ -276,8 +279,6 @@ const App = {
             }
             document.getElementById('latestPhotoTime').innerText = 'Menunggu ESP32';
             document.getElementById('latestPhotoVerdict').innerText = 'BELUM TERHUBUNG';
-
-            this.updateTimerDisplay({ timer_active: 0, timer_remaining_seconds: 0, timer_end_time: '' });
         }
     },
 
@@ -325,21 +326,62 @@ const App = {
             timerContainer.style.display = 'block';
             setTimerContainer.style.display = 'none';
 
-            const remaining = s.timer_remaining_seconds;
-            const hours = Math.floor(remaining / 3600);
-            const minutes = Math.floor((remaining % 3600) / 60);
-            const seconds = remaining % 60;
-
-            digitsEl.innerText = 
-                String(hours).padStart(2, '0') + ':' +
-                String(minutes).padStart(2, '0') + ':' +
-                String(seconds).padStart(2, '0');
-            
+            // Simpan sisa detik & jalankan ticker lokal 1 detik agar hitungan terlihat hidup
+            this._timerRemaining = s.timer_remaining_seconds;
+            this._renderTimerDigits(this._timerRemaining, digitsEl);
             document.getElementById('timerTargetEndTime').innerText = 'Selesai pada: ' + (s.timer_end_time || '-');
+            this._startTimerTicker(digitsEl);
         } else {
             timerContainer.style.display = 'none';
             setTimerContainer.style.display = 'block';
-            digitsEl.innerText = '00:00:00';
+            if (digitsEl) digitsEl.innerText = '00:00:00';
+            this._stopTimerTicker();
+        }
+
+        // Stopwatch hanya bisa dipakai saat ESP32 terhubung (sama seperti fitur lainnya)
+        this._updateTimerConnectionLock(s.esp32_online === true);
+    },
+
+    _updateTimerConnectionLock(online) {
+        const locked = !online;
+        const setCtl = document.getElementById('setTimerControls');
+        if (setCtl) {
+            setCtl.querySelectorAll('button, input').forEach(el => { el.disabled = locked; });
+            setCtl.classList.toggle('opacity-50', locked);
+            setCtl.classList.toggle('pointer-events-none', locked);
+        }
+        const activeWidget = document.getElementById('activeTimerWidget');
+        const cancelBtn = activeWidget ? activeWidget.querySelector('button') : null;
+        if (cancelBtn) cancelBtn.disabled = locked;
+        const hint = document.getElementById('timerOfflineHint');
+        if (hint) hint.style.display = locked ? 'block' : 'none';
+    },
+
+    _renderTimerDigits(sec, digitsEl) {
+        const el = digitsEl || document.getElementById('timerDigitsDisplay');
+        if (!el) return;
+        sec = Math.max(0, sec | 0);
+        const hours = Math.floor(sec / 3600);
+        const minutes = Math.floor((sec % 3600) / 60);
+        const seconds = sec % 60;
+        el.innerText =
+            String(hours).padStart(2, '0') + ':' +
+            String(minutes).padStart(2, '0') + ':' +
+            String(seconds).padStart(2, '0');
+    },
+
+    _startTimerTicker(digitsEl) {
+        this._stopTimerTicker();
+        this._timerTickHandle = setInterval(() => {
+            if (this._timerRemaining > 0) this._timerRemaining--;
+            this._renderTimerDigits(this._timerRemaining, digitsEl);
+        }, 1000);
+    },
+
+    _stopTimerTicker() {
+        if (this._timerTickHandle) {
+            clearInterval(this._timerTickHandle);
+            this._timerTickHandle = null;
         }
     },
 
