@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * SkyGuard AI - Computer Vision & Weather Analysis Engine
  * Powered by Google Gemini / OpenAI AI Vision API (konfigurasi via file .env)
@@ -348,7 +348,11 @@ function skyGuardVisionPrompt() {
     return "You are SkyGuard AI, an expert computer vision model for an automated IoT clothesline.
 Analyze this photo taken by the ESP32-CAM module facing upwards/outdoors.
 Task:
-1. Identify if the light source is Natural Daylight/Sunlight ('SUNLIGHT'), Artificial Indoor Room Lamp/Bulb ('ARTIFICIAL_LAMP'), or Night/Dark ('DARK').
+1. Identify the dominant light source:
+   - 'SUNLIGHT' = natural daylight/sun from outdoor sky.
+   - 'ARTIFICIAL_LAMP' = indoor/room bulb, lamp, ceiling light, or any man-made electric light (even if the area looks bright). Choose this when you see a lamp/bulb/fixture or indoor room context.
+   - 'DARK'/'MALAM' = natural night darkness with moon/stars and NO artificial light source.
+   Do NOT confuse a bright artificial lamp with sunlight, and do NOT mistake an indoor lit room for night.
 2. Classify the sky condition: 'CERAH' (sunny/clear, blue sky dominant), 'BERAWAN' (partly cloudy, some clouds but sunlight still visible), 'MENDUNG' (dark gray overcast threatening rain), 'HUJAN' (raining), or 'MALAM' (night/dark).
 3. Determine recommended roof action: 'OPEN' (if sunlight and good weather) or 'CLOSED' (if overcast mendung, rain, night, or lamp).
 4. Suggest drying duration in minutes (integer between 0 and 180).
