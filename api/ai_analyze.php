@@ -147,13 +147,10 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     }
     }
 
-    // Jika AI memutuskan untuk mengubah posisi atap (AUTO), terapkan sebagai
-    // "input" AI Vision melalui fungsi terpusat (termasuk log & proteksi hujan).
-    if ($roofAction !== 'NO_CHANGE') {
-        applyRoofCommand($pdo, $newRoofStatus, $actionReason, 'AI_VISION');
-    }
-
-    // Update device state (tanpa roof_status; dikelola oleh applyRoofCommand di atas)
+    // Update device state dengan hasil analisis AI terlebih dahulu (tanpa roof_status;
+    // roof_status dikelola oleh applyRoofCommand di bawah). Dilakukan SEBELUM
+    // applyRoofCommand agar log telemetri (sensor_logs) mencatat verdict foto ini,
+    // bukan verdict foto sebelumnya.
     $update = $pdo->prepare("
         UPDATE device_state 
         SET ai_light_verdict = ?,
@@ -174,6 +171,12 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
         $dryingMinutes,
         $actionReason
     ]);
+
+    // Jika AI memutuskan untuk mengubah posisi atap (AUTO), terapkan sebagai
+    // "input" AI Vision melalui fungsi terpusat (termasuk log & proteksi hujan).
+    if ($roofAction !== 'NO_CHANGE') {
+        applyRoofCommand($pdo, $newRoofStatus, $actionReason, 'AI_VISION');
+    }
 
     // Insert camera history record
     $hist = $pdo->prepare("
@@ -353,8 +356,9 @@ Task:
    - 'ARTIFICIAL_LAMP' = indoor/room bulb, lamp, ceiling light, or any man-made electric light (even if the area looks bright). Choose this when you see a lamp/bulb/fixture or indoor room context.
    - 'DARK'/'MALAM' = natural night darkness with moon/stars and NO artificial light source.
    Do NOT confuse a bright artificial lamp with sunlight, and do NOT mistake an indoor lit room for night.
-2. Classify the sky condition: 'CERAH' (sunny/clear, blue sky dominant), 'BERAWAN' (partly cloudy, some clouds but sunlight still visible), 'MENDUNG' (dark gray overcast threatening rain), 'HUJAN' (raining), or 'MALAM' (night/dark).
-3. Determine recommended roof action: 'OPEN' (if sunlight and good weather) or 'CLOSED' (if overcast mendung, rain, night, or lamp).
+ 2. Classify the sky condition: 'CERAH' (sunny/clear, blue sky dominant), 'BERAWAN' (partly cloudy, some clouds but sunlight still visible), 'MENDUNG' (dark gray overcast threatening rain), 'HUJAN' (raining), or 'MALAM' (night/dark).
+    CRITICAL: If you see ANY rain — including light drizzle / 'rintik-rintik' on an otherwise bright day — classify as 'HUJAN', NEVER as 'BERAWAN'. Rain means 'HUJAN' regardless of how bright the scene is. A 'sunshower' (hujan rintik di tengah cuaca cerah) is STILL 'HUJAN'. Also: street/road lamps, building lights, or any man-made light at night = 'ARTIFICIAL_LAMP' / 'MALAM' with artificial light, NOT 'SUNLIGHT'.
+ 3. Determine recommended roof action: 'OPEN' (only if SUNLIGHT and good dry weather: CERAH/BERAWAN with no rain) or 'CLOSED' (if overcast MENDUNG, rain/HUJAN, night/MALAM, or lamp/ARTIFICIAL_LAMP). Any rain -> CLOSED.
 4. Suggest drying duration in minutes (integer between 0 and 180).
 5. Give a concise explanation in Indonesian.
 
