@@ -80,10 +80,10 @@
     </nav>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-6">
 
         <!-- Top Row: Interactive Roof Visualizer & Control Station -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
             <!-- Left: Animated SVG Roof Visualizer (7 Cols) -->
             <div class="lg:col-span-7 glass-panel p-5 relative overflow-hidden flex flex-col justify-between">
@@ -345,7 +345,7 @@
         </div>
 
         <!-- Bottom Row: Camera AI Station, Charts, and System Notifications -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
             <!-- Left: ESP32-CAM AI Vision Snapshot Station (4 Cols) -->
             <div class="lg:col-span-4 glass-panel p-5 flex flex-col justify-between space-y-4">
@@ -557,7 +557,7 @@
     </div>
 
     <!-- Live Toast Notification Container -->
-    <div id="liveToast" class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform translate-y-8 opacity-0 pointer-events-none border-cyan-500/40 bg-slate-900/90 text-cyan-100">
+    <div id="liveToast" class="fixed bottom-24 sm:bottom-6 right-6 z-[1001] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform translate-y-8 opacity-0 pointer-events-none border-cyan-500/40 bg-slate-900/90 text-cyan-100">
         <i id="liveToastIcon" class="fas fa-info-circle text-lg text-cyan-400"></i>
         <span id="liveToastMsg" class="text-xs font-semibold">Notifikasi</span>
     </div>

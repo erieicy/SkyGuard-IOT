@@ -126,7 +126,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                     <p class="text-xs text-slate-400">Riwayat tangkapan kamera beserta hasil evaluasi AI vision</p>
                 </div>
 
-                <button onclick="skyguardDeleteAllPhotos()" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-600 text-white shadow transition-all flex items-center gap-2">
+                <button onclick="skyguardDeleteAllPhotos()" class="shrink-0 self-start sm:self-auto px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all whitespace-nowrap flex items-center gap-1.5">
                     <i class="fas fa-trash-can"></i> Hapus Semua Foto
                 </button>
             </div>
@@ -203,8 +203,8 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                         </h2>
                         <p class="text-xs text-slate-400">Catatan pembacaan sensor dan perubahan posisi atap</p>
                     </div>
-                    <button onclick="skyguardDeleteAllSensorLogs()" class="shrink-0 px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all">
-                        <i class="fas fa-trash-can mr-1"></i> Hapus Semua Log
+                    <button onclick="skyguardDeleteAllSensorLogs()" class="shrink-0 px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all whitespace-nowrap flex items-center gap-1.5">
+                        <i class="fas fa-trash-can"></i> Hapus Semua Log
                     </button>
                 </div>
             </div>
@@ -272,9 +272,6 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         <a href="index.php" class="mobile-nav-item">
             <i class="fas fa-gauge-high"></i>
             <span>Dashboard</span>
-        </a>
-        <a href="index.php" class="mobile-snap-btn-center" title="Foto Langsung">
-            <i class="fas fa-camera"></i>
         </a>
         <a href="history.php" class="mobile-nav-item active">
             <i class="fas fa-images"></i>
