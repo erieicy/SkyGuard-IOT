@@ -194,7 +194,7 @@
                     </div>
 
                     <!-- Direct Action Buttons -->
-                    <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="grid grid-cols-2 gap-3 mb-2">
                         <button id="btnOpenRoof" onclick="App.setRoof('OPEN')" class="btn-action-open flex items-center justify-center gap-2 text-sm">
                             <i class="fas fa-door-open text-base"></i> Buka Jemuran
                         </button>
@@ -202,6 +202,7 @@
                             <i class="fas fa-door-closed text-base"></i> Tutup Jemuran
                         </button>
                     </div>
+                    <p id="controlOfflineHint" style="display: none;" class="text-[10px] text-rose-300 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengendalikan panel ini.</p>
 
                     <!-- Smart Feature Toggle: Auto Close on Mendung -->
                     <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
@@ -377,9 +378,10 @@
 
                 <!-- Camera Trigger Actions -->
                 <div class="space-y-2">
-                    <button onclick="App.triggerEsp32CamSnapshot()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition-all">
+                    <button id="btnCamSnapshot" onclick="App.triggerEsp32CamSnapshot()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 transition-all">
                         <i class="fas fa-tower-broadcast text-base"></i> Minta ESP32-CAM Ambil Foto
                     </button>
+                    <p id="camOfflineHint" style="display: none;" class="text-[10px] text-rose-300 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk meminta foto.</p>
                     
                 </div>
             </div>
@@ -566,6 +568,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js?v=20260830t4"></script>
+    <script src="assets/js/app.js?v=20260830t5"></script>
 </body>
 </html>

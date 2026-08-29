@@ -211,6 +211,7 @@ const App = {
 
         // 7b. Kunci fitur yang butuh ESP32 saat terputus (seperti Stopwatch)
         this._updateAiActionLock(s.esp32_online === true);
+        this._updateControlConnectionLock(s.esp32_online === true);
 
         // 8. Latest Camera Photo
         if (data.latest_photo && data.latest_photo.image_path) {
@@ -372,6 +373,23 @@ const App = {
         if (hint) hint.style.display = locked ? 'block' : 'none';
     },
 
+    _updateControlConnectionLock(online) {
+        const locked = !online;
+        const ids = ['btnModeAuto', 'btnModeManual', 'btnModeTimer', 'btnOpenRoof', 'btnCloseRoof', 'btnCamSnapshot'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.disabled = locked;
+                el.classList.toggle('opacity-50', locked);
+                el.classList.toggle('pointer-events-none', locked);
+            }
+        });
+        ['controlOfflineHint', 'camOfflineHint'].forEach(h => {
+            const hint = document.getElementById(h);
+            if (hint) hint.style.display = locked ? 'block' : 'none';
+        });
+    },
+
     _renderTimerDigits(sec, digitsEl) {
         const el = digitsEl || document.getElementById('timerDigitsDisplay');
         if (!el) return;
@@ -465,6 +483,10 @@ const App = {
     // ACTION CONTROLS
     // ==========================================
     setRoof(targetStatus) {
+        if (!appState || appState.esp32_online !== true) {
+            showToast('Hubungkan ESP32 terlebih dahulu untuk mengendalikan atap.', 'info');
+            return;
+        }
         showToast(`Mengirim perintah: ${targetStatus === 'OPEN' ? 'Buka Atap' : 'Tutup Atap'}...`, 'info');
         
         fetch('api/control.php', {
@@ -506,6 +528,10 @@ const App = {
     },
 
     setMode(mode) {
+        if (!appState || appState.esp32_online !== true) {
+            showToast('Hubungkan ESP32 terlebih dahulu untuk mengubah mode.', 'info');
+            return;
+        }
         showToast(`Mengubah mode ke: ${mode}...`, 'info');
 
         fetch('api/control.php', {
@@ -720,6 +746,10 @@ const App = {
     },
 
     triggerEsp32CamSnapshot() {
+        if (!appState || appState.esp32_online !== true) {
+            showToast('Hubungkan ESP32 terlebih dahulu untuk meminta foto.', 'info');
+            return;
+        }
         showToast('📡 Mengirim sinyal ke modul ESP32-CAM untuk mengambil foto...', 'info');
         
         fetch('api/esp32.php?action=request_snapshot', { method: 'POST' })
