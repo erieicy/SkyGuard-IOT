@@ -20,6 +20,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <ESP32Servo.h>
+#include <Preferences.h>
 
 // ==========================================
 // 1. PENGATURAN WI-FI & SERVER
@@ -29,7 +30,9 @@ const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";    // Ganti dengan Password Wi
 
 // Masukkan URL Server SkyGuard AI (Ganti IP Laptop/Server XAMPP Anda)
 // Contoh: "http://192.168.1.100/SkyGuard-AI/api/esp32.php"
-const String SERVER_URL   = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
+// URL ini BISA diubah secara dinamis dari Dashboard melalui tombol "Hubungkan"
+// (Dashboard akan mengirim perintah ke http://<IP_ESP32>/connect?server=URL_DASHBOARD)
+String serverUrl = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
 
 // ==========================================
 // 2. PINOUT HARDWARE ESP32
@@ -45,6 +48,12 @@ const String SERVER_URL   = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
 // 3. VARIABEL & OBJEK KONTROL
 // ==========================================
 Servo roofServo;
+
+// Penyimpanan persisten (EEPROM emulasi) untuk URL Server
+Preferences preferences;
+
+// Web server kecil di ESP32 untuk menerima perintah "Hubungkan" dari Dashboard
+WiFiServer esp32Server(80);
 
 // Posisi Derajat Servo:
 // 180 Derajat = Jemuran Terbuka Penuh
@@ -93,6 +102,20 @@ void setup() {
   // Hubungkan ke Wi-Fi
   connectToWiFi();
 
+  // Muat URL Server dari memori persisten (jika pernah diatur via Dashboard "Hubungkan")
+  preferences.begin("skyguard", false);
+  String savedUrl = preferences.getString("server_url", "");
+  if (savedUrl.length() > 0) {
+    serverUrl = savedUrl;
+    Serial.println("[CONFIG] URL Server dimuat dari memori: " + serverUrl);
+  } else {
+    Serial.println("[CONFIG] URL Server default: " + serverUrl);
+  }
+
+  // Mulai Web Server kecil di port 80 untuk menerima perintah dari Dashboard
+  esp32Server.begin();
+  Serial.println("[WEB] ESP32 HTTP Server aktif di port 80. Dashboard dapat mengirim /connect?server=URL");
+
   // Bunyikan nada beep indikasi sistem aktif
   playBeep(2, 100);
 }
@@ -108,6 +131,9 @@ void loop() {
   } else {
     digitalWrite(PIN_LED_STATUS, HIGH);
   }
+
+  // Tangani perintah masuk dari Dashboard (misal: /connect?server=URL)
+  handleEsp32Server();
 
   // 1. Baca Sensor Lokal
   int rainDigital = digitalRead(PIN_RAIN_DIGITAL); // 0 = Air terdeteksi (Active LOW pada modul umum)
@@ -171,7 +197,7 @@ void sendSensorDataToServer(int rain, int light) {
   if (WiFi.status() != WL_CONNECTED) return;
 
   HTTPClient http;
-  String url = SERVER_URL + "?action=update_sensors";
+  String url = serverUrl + "?action=update_sensors";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
 
@@ -198,7 +224,7 @@ void fetchCommandsFromServer() {
   if (WiFi.status() != WL_CONNECTED) return;
 
   HTTPClient http;
-  String url = SERVER_URL + "?action=get_command";
+  String url = serverUrl + "?action=get_command";
   http.begin(url);
 
   int httpCode = http.GET();
@@ -229,6 +255,65 @@ void fetchCommandsFromServer() {
     }
   }
   http.end();
+}
+
+// ==========================================
+// 7B. WEB SERVER KECIL (Terima Perintah "Hubungkan" dari Dashboard)
+// ==========================================
+void handleEsp32Server() {
+  WiFiClient client = esp32Server.available();
+  if (!client) return;
+
+  // Baca baris request pertama: "GET /connect?server=... HTTP/1.1"
+  String reqLine = client.readStringUntil('\n');
+  reqLine.trim();
+
+  // Ambil path + query string
+  int firstSpace = reqLine.indexOf(' ');
+  int secondSpace = reqLine.indexOf(' ', firstSpace + 1);
+  String path = (firstSpace >= 0 && secondSpace >= 0)
+      ? reqLine.substring(firstSpace + 1, secondSpace)
+      : "";
+
+  // Baca sisa header hingga baris kosong
+  while (client.available()) {
+    String line = client.readStringUntil('\n');
+    if (line == "\r" || line == "\n" || line == "") break;
+  }
+
+  String body = "SkyGuard ESP32 Controller Ready";
+
+  if (path.startsWith("/connect")) {
+    // Parse query: ?server=URL_ENCODED
+    int q = path.indexOf("server=");
+    if (q >= 0) {
+      String newUrl = path.substring(q + 7);
+
+      // URL-decode sederhana untuk karakter umum
+      newUrl.replace("%2F", "/");
+      newUrl.replace("%3A", ":");
+      newUrl.replace("%3D", "=");
+      newUrl.replace("%26", "&");
+      newUrl.replace("+", "");
+
+      serverUrl = newUrl;
+      preferences.putString("server_url", serverUrl);
+      Serial.println("\n[WEB] Perintah 'Hubungkan' diterima dari Dashboard.");
+      Serial.println("[WEB] ESP32 akan mempolling server: " + serverUrl);
+      body = "OK. ESP32 sekarang mempolling: " + serverUrl;
+      playBeep(2, 80);
+    } else {
+      body = "ERROR: parameter 'server' tidak ditemukan";
+    }
+  }
+
+  // Kirim respons HTTP sederhana
+  String resp = "HTTP/1.1 200 OK\r\n";
+  resp += "Content-Type: text/plain\r\n";
+  resp += "Connection: close\r\n\r\n";
+  resp += body;
+  client.print(resp);
+  client.stop();
 }
 
 // ==========================================

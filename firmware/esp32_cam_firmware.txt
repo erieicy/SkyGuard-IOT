@@ -17,6 +17,7 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
 
 // ==========================================
 // 1. PENGATURAN WI-FI & SERVER
@@ -24,8 +25,17 @@
 const char* WIFI_SSID     = "NAMA_WIFI_ANDA";
 const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";
 
-// URL Endpoint Upload Gambar SkyGuard AI
-const String SERVER_UPLOAD_URL = "http://192.168.1.100/SkyGuard-AI/api/esp32.php?action=upload_cam";
+// URL Dasar Server SkyGuard AI (bisa diubah via Dashboard "Hubungkan")
+// Contoh: "http://192.168.1.100/SkyGuard-AI/api/esp32.php"
+String baseServerUrl = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
+
+// URL Endpoint dibentuk dari baseServerUrl
+String SERVER_UPLOAD_URL   = baseServerUrl + "?action=upload_cam";
+String SERVER_COMMAND_URL  = baseServerUrl + "?action=get_command";
+
+// Web server kecil untuk menerima perintah "Hubungkan" dari Dashboard
+WiFiServer esp32CamServer(80);
+Preferences camPreferences;
 
 // ==========================================
 // 2. PINOUT CAMERA AI-THINKER ESP32-CAM
@@ -58,9 +68,6 @@ unsigned long lastCaptureTime = 0;
 const unsigned long POLL_INTERVAL = 3000;
 unsigned long lastPollTime = 0;
 
-// URL Server Polling Command
-const String SERVER_COMMAND_URL = "http://192.168.1.100/SkyGuard-AI/api/esp32.php?action=get_command";
-
 // ==========================================
 // 3. SETUP SISTEM
 // ==========================================
@@ -84,6 +91,22 @@ void setup() {
   // Koneksi Wi-Fi
   connectWiFi();
 
+  // Muat URL Server dari memori persisten (jika diatur via Dashboard "Hubungkan")
+  camPreferences.begin("skyguard_cam", false);
+  String savedUrl = camPreferences.getString("server_url", "");
+  if (savedUrl.length() > 0) {
+    baseServerUrl = savedUrl;
+    SERVER_UPLOAD_URL = baseServerUrl + "?action=upload_cam";
+    SERVER_COMMAND_URL = baseServerUrl + "?action=get_command";
+    Serial.println("[CONFIG] URL Server dimuat dari memori: " + baseServerUrl);
+  } else {
+    Serial.println("[CONFIG] URL Server default: " + baseServerUrl);
+  }
+
+  // Mulai Web Server kecil di port 80 untuk menerima perintah dari Dashboard
+  esp32CamServer.begin();
+  Serial.println("[WEB] ESP32-CAM HTTP Server aktif di port 80. Dashboard dapat mengirim /connect?server=URL");
+
   // Ambil foto pertama setelah boot
   delay(2000);
   captureAndUploadSkyImage();
@@ -96,6 +119,9 @@ void loop() {
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
   }
+
+  // Tangani perintah masuk dari Dashboard (misal: /connect?server=URL)
+  handleCamEsp32Server();
 
   // 1. Cek perintah snapshot instan dari Dashboard
   if (millis() - lastPollTime >= POLL_INTERVAL) {
@@ -126,6 +152,66 @@ void checkRemoteSnapshotTrigger() {
     }
   }
   http.end();
+}
+
+// ==========================================
+// 4B. WEB SERVER KECIL (Terima Perintah "Hubungkan" dari Dashboard)
+// ==========================================
+void handleCamEsp32Server() {
+  WiFiClient client = esp32CamServer.available();
+  if (!client) return;
+
+  // Baca baris request pertama: "GET /connect?server=... HTTP/1.1"
+  String reqLine = client.readStringUntil('\n');
+  reqLine.trim();
+
+  // Ambil path + query string
+  int firstSpace = reqLine.indexOf(' ');
+  int secondSpace = reqLine.indexOf(' ', firstSpace + 1);
+  String path = (firstSpace >= 0 && secondSpace >= 0)
+      ? reqLine.substring(firstSpace + 1, secondSpace)
+      : "";
+
+  // Baca sisa header hingga baris kosong
+  while (client.available()) {
+    String line = client.readStringUntil('\n');
+    if (line == "\r" || line == "\n" || line == "") break;
+  }
+
+  String body = "SkyGuard ESP32-CAM Ready";
+
+  if (path.startsWith("/connect")) {
+    // Parse query: ?server=URL_ENCODED
+    int q = path.indexOf("server=");
+    if (q >= 0) {
+      String newUrl = path.substring(q + 7);
+
+      // URL-decode sederhana untuk karakter umum
+      newUrl.replace("%2F", "/");
+      newUrl.replace("%3A", ":");
+      newUrl.replace("%3D", "=");
+      newUrl.replace("%26", "&");
+      newUrl.replace("+", "");
+
+      baseServerUrl = newUrl;
+      SERVER_UPLOAD_URL = baseServerUrl + "?action=upload_cam";
+      SERVER_COMMAND_URL = baseServerUrl + "?action=get_command";
+      camPreferences.putString("server_url", baseServerUrl);
+      Serial.println("\n[WEB] Perintah 'Hubungkan' diterima dari Dashboard.");
+      Serial.println("[WEB] ESP32-CAM akan mempolling server: " + baseServerUrl);
+      body = "OK. ESP32-CAM sekarang mempolling: " + baseServerUrl;
+    } else {
+      body = "ERROR: parameter 'server' tidak ditemukan";
+    }
+  }
+
+  // Kirim respons HTTP sederhana
+  String resp = "HTTP/1.1 200 OK\r\n";
+  resp += "Content-Type: text/plain\r\n";
+  resp += "Connection: close\r\n\r\n";
+  resp += body;
+  client.print(resp);
+  client.stop();
 }
 
 // ==========================================

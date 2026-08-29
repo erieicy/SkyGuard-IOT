@@ -517,6 +517,49 @@ const App = {
         .catch(err => console.error('Upload error:', err));
     },
 
+    connectEsp32() {
+        const ipInput = document.getElementById('espIpInput');
+        const ip = ipInput ? ipInput.value.trim() : '';
+
+        if (!ip) {
+            showToast('Masukkan alamat IP ESP32 terlebih dahulu (misal: 192.168.1.50)', 'danger');
+            if (ipInput) ipInput.focus();
+            return;
+        }
+
+        // Validasi format IP sederhana
+        const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+        if (!ipRegex.test(ip)) {
+            showToast('Format IP tidak valid. Gunakan format: 192.168.1.xxx', 'danger');
+            return;
+        }
+
+        showToast('🔗 Menghubungkan ESP32 (' + ip + ') ke dashboard...', 'info');
+
+        fetch('api/esp32.php?action=connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip: ip })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                AudioAlerts.playSuccessTone();
+                const statusMsg = data.reachable
+                    ? 'ESP32 terjangkau & terhubung!'
+                    : 'ESP32 dicatat sebagai terhubung (pastikan firmware mempolling server).';
+                showToast(data.message + ' — ' + statusMsg, 'success');
+                this.fetchStatus();
+            } else {
+                showToast(data.error || 'Gagal menghubungkan ESP32', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Connect ESP32 error:', err);
+            showToast('Gagal mengirim perintah koneksi ke server', 'danger');
+        });
+    },
+
     triggerEsp32CamSnapshot() {
         showToast('📡 Mengirim sinyal ke modul ESP32-CAM untuk mengambil foto...', 'info');
         

@@ -96,10 +96,11 @@ c:/xampp/htdocs/SkyGuard-AI/
      ```
      http://localhost/SkyGuard-AI/
      ```
- 3. **Hubungkan ESP32 via Wi-Fi**:
-    - Isi IP ESP32 (mis. `192.168.1.x`) di kolom WiFi pojok kanan atas dashboard.
-    - Saat ESP32 mem-poll server, tombol indikator berubah **hijau (TERHUBUNG)**; jika putus menjadi **merah (TIDAK TERHUBUNG)** dan seluruh data telemetri tampil kosong.
-    - Pastikan firmware ESP32 & ESP32-CAM diisi `SERVER_URL` = alamat server di atas (lihat menu Pengaturan AI).
+  3. **Hubungkan ESP32 via Wi-Fi**:
+     - Isi IP ESP32 (mis. `192.168.1.x`) di kolom WiFi pojok kanan atas dashboard.
+     - Klik tombol **Hubungkan** di sebelah kolom IP untuk menyimpan IP ESP32 dan mengirim perintah koneksi ke perangkat (firmware akan otomatis mem-poll server dashboard).
+     - Saat ESP32 mem-poll server, tombol indikator berubah **hijau (TERHUBUNG)**; jika putus menjadi **merah (TIDAK TERHUBUNG)** dan seluruh data telemetri tampil kosong.
+     - Pastikan firmware ESP32 & ESP32-CAM diisi `serverUrl` = alamat server di atas (lihat menu Pengaturan AI). Firmware terbaru mendukung perubahan URL server secara dinamis via tombol Hubungkan.
 
 ---
 
@@ -115,6 +116,7 @@ c:/xampp/htdocs/SkyGuard-AI/
 | `GET` | `/api/esp32.php?action=get_command` | Digunakan ESP32 untuk polling posisi target servo/motor & melaporkan IP-nya. |
 | `POST` | `/api/esp32.php?action=update_sensors` | Digunakan ESP32 untuk mengirim nilai sensor air dan cahaya. |
 | `POST` | `/api/esp32.php?action=upload_cam` | Digunakan ESP32-CAM untuk mengunggah foto langit. |
+| `POST` | `/api/esp32.php?action=connect` | Menghubungkan ESP32 ke dashboard: menyimpan IP ESP32, menandai sebagai online, dan mengirim URL server ke perangkat agar mulai mem-poll. |
 | `GET` | `/api/history.php` | Mengambil riwayat log telemetri dan galeri foto cuaca. |
 
 ---

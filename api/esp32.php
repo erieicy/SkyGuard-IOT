@@ -62,6 +62,61 @@ if ($action === 'request_snapshot') {
     exit;
 }
 
+// Manual connection from Dashboard: store ESP32 IP & mark as online
+if ($action === 'connect') {
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw, true) ?? $_POST;
+
+    $ip = trim($data['ip'] ?? '');
+    if (empty($ip)) {
+        // Coba ambil dari GET
+        $ip = trim($_GET['ip'] ?? '');
+    }
+
+    if (empty($ip)) {
+        echo json_encode(['success' => false, 'error' => 'IP ESP32 wajib diisi']);
+        exit;
+    }
+
+    // Validasi format IP (IPv4)
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        echo json_encode(['success' => false, 'error' => 'Format alamat IP tidak valid']);
+        exit;
+    }
+
+    // Simpan IP & tandai ESP32 sebagai terhubung (perbarui esp32_last_seen ke UTC sekarang)
+    $pdo->prepare("UPDATE device_state SET esp32_ip = ?, esp32_last_seen = datetime('now') WHERE id = 1")
+        ->execute([$ip]);
+
+    // Ping ESP32 untuk memverifikasi bahwa perangkat benar-benar dapat dijangkau.
+    // ESP32 (jika memilki web server kecil) akan merespons; jika tidak, kita anggap tetap terhubung
+    // karena polling otomatis dari firmware akan memperbarui esp32_last_seen.
+    $reachable = false;
+    $pingUrl = 'http://' . $ip . '/';
+    $ctx = @stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
+    $resp = @file_get_contents($pingUrl, false, $ctx, 0, 64);
+    if ($resp !== false || (isset($http_response_header) && count($http_response_header) > 0)) {
+        $reachable = true;
+    }
+
+    // Jika server Host tersedia, kirim perintah koneksi ke ESP32 agar ia mulai polling dashboard.
+    // Firmware harus mendukung endpoint /connect?server=URL (lihat firmware esp32_firmware.txt).
+    $serverHost = $pdo->query("SELECT value FROM settings WHERE key = 'server_host'")->fetchColumn();
+    if (!empty($serverHost)) {
+        $connectUrl = $pingUrl . 'connect?server=' . urlencode($serverHost);
+        $cctx = @stream_context_create(['http' => ['timeout' => 3, 'ignore_errors' => true, 'method' => 'GET']]);
+        @file_get_contents($connectUrl, false, $cctx, 0, 64);
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'ESP32 (' . $ip . ') berhasil dihubungkan ke dashboard SkyGuard AI',
+        'esp32_ip' => $ip,
+        'reachable' => $reachable
+    ]);
+    exit;
+}
+
 // 2. ESP32 Sensor Telemetry Upload
 if ($action === 'update_sensors') {
     $raw = file_get_contents('php://input');
