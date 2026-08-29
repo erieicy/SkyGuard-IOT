@@ -54,16 +54,6 @@
             </div>
         </div>
 
-        <!-- Middle Menu Links -->
-        <div class="hidden md:flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-            <a href="index.php" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-2">
-                <i class="fas fa-gauge-high"></i> Dashboard
-            </a>
-            <a href="history.php" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-2">
-                <i class="fas fa-images"></i> Galeri & Riwayat Foto AI
-            </a>
-        </div>
-
         <!-- Right System Status -->
         <div class="flex items-center gap-3">
             <div class="flex items-center gap-2">
@@ -80,7 +70,7 @@
     </nav>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-6">
+    <main class="max-w-7xl mx-auto px-4 lg:px-8 pt-8 pb-28 space-y-6">
 
         <!-- Top Row: Interactive Roof Visualizer & Control Station -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -553,6 +543,19 @@
         <a href="history.php" class="mobile-nav-item">
             <i class="fas fa-images"></i>
             <span>Riwayat AI</span>
+        </a>
+    </div>
+
+    <!-- Desktop Bottom Navigation (mirrors mobile, shown on sm+) -->
+    <div class="desktop-bottom-nav">
+        <a href="index.php" class="active">
+            <i class="fas fa-gauge-high"></i> Dashboard
+        </a>
+        <a href="index.php" class="desktop-snap-btn-center" title="Foto Langsung">
+            <i class="fas fa-camera"></i>
+        </a>
+        <a href="history.php">
+            <i class="fas fa-images"></i> Riwayat AI
         </a>
     </div>
 

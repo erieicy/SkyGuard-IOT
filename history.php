@@ -72,16 +72,6 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
             </div>
         </div>
 
-        <!-- Middle Menu Links -->
-        <div class="hidden md:flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-            <a href="index.php" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all flex items-center gap-2">
-                <i class="fas fa-gauge-high"></i> Dashboard
-            </a>
-            <a href="history.php" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-2">
-                <i class="fas fa-images"></i> Galeri & Riwayat Foto AI
-            </a>
-        </div>
-
         <div>
             <a href="index.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-2 transition-all">
                 <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
@@ -90,7 +80,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
     </nav>
 
     <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+    <main class="max-w-7xl mx-auto px-4 lg:px-8 pt-6 pb-28 space-y-6">
 
         <!-- Stats Overview Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -195,18 +185,16 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
 
         <!-- Telemetry Sensor Logs Table -->
         <div class="glass-panel p-6">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                <div class="flex items-start justify-between gap-3 w-full">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
-                            <i class="fas fa-list-check text-cyan-400"></i> Log Telemetri Sensor & Aksi Sistem
-                        </h2>
-                        <p class="text-xs text-slate-400">Catatan pembacaan sensor dan perubahan posisi atap</p>
-                    </div>
-                    <button onclick="skyguardDeleteAllSensorLogs()" class="shrink-0 px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all whitespace-nowrap flex items-center gap-1.5">
-                        <i class="fas fa-trash-can"></i> Hapus Semua Log
-                    </button>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fas fa-list-check text-cyan-400"></i> Log Telemetri Sensor & Aksi Sistem
+                    </h2>
+                    <p class="text-xs text-slate-400">Catatan pembacaan sensor dan perubahan posisi atap</p>
                 </div>
+                <button onclick="skyguardDeleteAllSensorLogs()" class="shrink-0 self-start sm:self-auto px-3 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-semibold shadow transition-all whitespace-nowrap flex items-center gap-1.5">
+                    <i class="fas fa-trash-can"></i> Hapus Semua Log
+                </button>
             </div>
 
             <div class="overflow-x-auto">
@@ -253,8 +241,8 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                                     <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-[10px]"><?= $l['control_mode'] ?></span></td>
                                     <td class="py-3 px-4 text-slate-400"><?= htmlspecialchars($l['action_triggered'] ?: 'PERIODIC_LOG') ?></td>
                                     <td class="py-3 px-4">
-                                        <button onclick="skyguardDeleteSensorLog(<?= (int)$l['id'] ?>)" title="Hapus log ini" class="px-2 py-1 rounded bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white text-[10px] transition-colors">
-                                            <i class="fas fa-trash-can"></i>
+                                        <button onclick="skyguardDeleteSensorLog(<?= (int)$l['id'] ?>)" title="Hapus log ini" class="w-7 h-7 rounded-lg bg-rose-600/85 hover:bg-rose-600 text-white text-xs flex items-center justify-center shadow transition-all">
+                                            <i class="fas fa-trash"></i>
                                         </button>
                                     </td>
                                 </tr>
@@ -276,6 +264,19 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         <a href="history.php" class="mobile-nav-item active">
             <i class="fas fa-images"></i>
             <span>Riwayat AI</span>
+        </a>
+    </div>
+
+    <!-- Desktop Bottom Navigation (mirrors mobile, shown on sm+) -->
+    <div class="desktop-bottom-nav">
+        <a href="index.php">
+            <i class="fas fa-gauge-high"></i> Dashboard
+        </a>
+        <a href="index.php" class="desktop-snap-btn-center" title="Foto Langsung">
+            <i class="fas fa-camera"></i>
+        </a>
+        <a href="history.php" class="active">
+            <i class="fas fa-images"></i> Riwayat AI
         </a>
     </div>
 

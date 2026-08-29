@@ -783,12 +783,13 @@ function showToast(message, type = 'info') {
     }
 
     toastIcon.className = `fas ${iconClass} text-lg`;
-    toast.className = `fixed top-20 right-4 sm:right-6 z-[1001] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform translate-y-0 opacity-100 ${borderColor}`;
+    const baseToast = 'fixed top-20 right-4 sm:right-6 z-[1001] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all duration-300 transform';
+    toast.className = `${baseToast} translate-y-0 opacity-100 ${borderColor}`;
     toastMsg.innerText = message;
 
     clearTimeout(toast._hideTimeout);
     toast._hideTimeout = setTimeout(() => {
-        toast.className += ' -translate-y-8 opacity-0 pointer-events-none';
+        toast.className = `${baseToast} -translate-y-8 opacity-0 pointer-events-none ${borderColor}`;
     }, 5000);
 }
 
