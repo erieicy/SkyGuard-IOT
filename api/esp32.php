@@ -208,8 +208,11 @@ if ($action === 'update_sensors') {
     ");
     $update->execute([$rain, $light, $newRoofStatus, $reason]);
 
-    // Periodically insert telemetry log (or on state change)
-    if ($actionTriggered !== null || rand(1, 10) === 1) {
+    // Catat log SETIAP perubahan sensor (hujan berubah ATAU cahaya berubah sedikit pun).
+    // Jika tidak ada perubahan sama sekali, tidak ada log baru.
+    $rainChanged = ($rain != (int)$state['rain_detected']);
+    $lightChanged = ($light != (int)$state['light_level']);
+    if ($actionTriggered !== null || $rainChanged || $lightChanged) {
         $log = $pdo->prepare("
             INSERT INTO sensor_logs (timestamp, rain_detected, light_level, roof_status, control_mode, weather_condition, light_verdict, action_triggered)
             VALUES (datetime('now', 'localtime'), ?, ?, ?, ?, ?, ?, ?)
