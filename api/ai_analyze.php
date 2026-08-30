@@ -195,6 +195,7 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
     ]);
 
     enforceRetention($pdo, 10);
+    enforcePhotoFileRetention(10);
 
     // Create system alert if Mendung / Hujan / Lamp
     if ($weatherVerdict === 'MENDUNG') {

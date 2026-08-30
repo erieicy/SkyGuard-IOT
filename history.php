@@ -7,6 +7,7 @@ $pdo = getDbConnection();
 
 // Batasi riwayat foto & log hanya 10 entri terbaru (hapus sisanya)
 enforceRetention($pdo, 10);
+enforcePhotoFileRetention(10);
 
 // Fetch Photo History
 $photosStmt = $pdo->query("SELECT * FROM camera_history ORDER BY id DESC LIMIT 10");

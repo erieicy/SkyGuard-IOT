@@ -105,6 +105,23 @@ function enforceRetention($pdo, $limit = 10) {
     }
 }
 
+/**
+ * Batasi jumlah file foto pada folder uploads agar hanya menyimpan $limit file terbaru.
+ * Menghapus file terlama (berdasarkan waktu modifikasi) yang melebihi batas,
+ * termasuk file yatim yang baris databasenya sudah terhapus.
+ */
+function enforcePhotoFileRetention($limit = 10) {
+    if (!is_dir(UPLOAD_DIR)) return;
+    $files = glob(UPLOAD_DIR . DIRECTORY_SEPARATOR . '*.{jpg,jpeg,png,webp}', GLOB_BRACE);
+    if (!is_array($files) || count($files) <= $limit) return;
+    usort($files, function ($a, $b) {
+        return filemtime($b) <=> filemtime($a); // terbaru lebih dulu
+    });
+    foreach (array_slice($files, $limit) as $old) {
+        @unlink($old);
+    }
+}
+
 function applyRoofCommand($pdo, $status, $reason, $source = 'MANUAL_OVERRIDE') {
     $status = strtoupper(trim($status));
     if (!in_array($status, ['OPEN', 'CLOSED'])) {
