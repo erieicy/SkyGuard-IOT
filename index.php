@@ -202,10 +202,8 @@
                             <i class="fas fa-door-closed text-base"></i> Tutup Jemuran
                         </button>
                     </div>
-                    <p id="controlOfflineHint" style="display: none;" class="text-[10px] text-rose-300 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengendalikan panel ini.</p>
-
                     <!-- Smart Feature Toggle: Auto Close on Mendung -->
-                    <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+                    <div id="containerMendungAutoClose" class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between transition-all">
                         <div class="flex items-center gap-2.5">
                             <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                                 <i class="fas fa-cloud-sun-rain text-sm"></i>
@@ -215,11 +213,12 @@
                                 <p class="text-[10px] text-slate-400">Tutup otomatis jika AI mendeteksi awan gelap</p>
                             </div>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
+                        <label id="labelMendungAutoClose" class="relative inline-flex items-center cursor-pointer transition-all">
                             <input type="checkbox" id="chkMendungAutoClose" onchange="App.toggleMendungAutoClose(this.checked)" checked class="sr-only peer">
                             <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
                         </label>
                     </div>
+                    <p id="controlOfflineHint" style="display: none;" class="text-[10px] text-rose-300 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengendalikan panel ini.</p>
                 </div>
 
                 <!-- Emergency Rain Alert Banner (Conditional) -->
@@ -330,10 +329,9 @@
                         <input id="customTimerInput" type="number" placeholder="Menit..." min="1" max="720" value="45" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-violet-500">
                         <button onclick="App.startTimer()" class="px-3 py-1 text-xs font-bold rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow transition-all">Mulai</button>
                     </div>
-                    <p id="timerOfflineHint" style="display: none;" class="text-[10px] text-rose-300 mt-2 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengatur Stopwatch Jemur.</p>
                 </div>
-
                 <p class="text-[11px] text-slate-400">Tutup atap otomatis saat timer habis</p>
+                <p id="timerOfflineHint" style="display: none;" class="text-[10px] text-rose-300 mt-2 text-center"><i class="fas fa-plug-circle-xmark"></i> Hubungkan ESP32 untuk mengatur Stopwatch.</p>
             </div>
         </div>
 
@@ -395,9 +393,6 @@
                         </h3>
                         <p class="text-[11px] text-slate-400">Data cahaya matahari & deteksi air real-time</p>
                     </div>
-                    <span class="text-[10px] text-slate-500 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-                        Update per 2 detik
-                    </span>
                 </div>
 
                 <!-- Canvas Chart -->
@@ -422,7 +417,7 @@
                     </div>
 
                     <!-- Alerts Feed List -->
-                    <div id="alertsListContainer" class="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                    <div id="alertsListContainer" class="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                         <div class="text-center py-6 text-slate-500 text-xs">
                             <i class="fas fa-spinner fa-spin mb-2"></i>
                             <p>Memuat notifikasi...</p>
@@ -568,6 +563,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js?v=20260830t5"></script>
+    <script src="assets/js/app.js"></script>
 </body>
 </html>

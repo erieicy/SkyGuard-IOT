@@ -156,6 +156,24 @@ switch ($action) {
         break;
 
     case 'toggle_mendung_autoclose':
+        // Pastikan ESP32 dalam kondisi terhubung
+        $espOnline = false;
+        $disc = (int)$pdo->query("SELECT esp32_disconnected FROM device_state WHERE id = 1")->fetchColumn();
+        if (!$disc && !empty($state['esp32_last_seen'])) {
+            $lastSeen = new DateTime($state['esp32_last_seen']);
+            $now = new DateTime('now');
+            $diffSec = $now->getTimestamp() - $lastSeen->getTimestamp();
+            $espOnline = ($diffSec <= 45);
+        }
+
+        if (!$espOnline) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'ESP32 belum terhubung. Hubungkan ESP32 terlebih dahulu untuk mengubah pengaturan Auto-Close Saat Mendung.'
+            ]);
+            exit;
+        }
+
         $val = isset($data['enabled']) && ($data['enabled'] == 1 || $data['enabled'] === true || $data['enabled'] === '1') ? 1 : 0;
         $update = $pdo->prepare("
             UPDATE device_state 

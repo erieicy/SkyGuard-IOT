@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * SkyGuard AI - Computer Vision & Weather Analysis Engine
  * Powered by Google Gemini / OpenAI AI Vision API (konfigurasi via file .env)
@@ -315,7 +315,7 @@ function analyzeSkyWithAI($filePath, $aiConfig = []) {
 
     // 1. Google Gemini Vision API
     if ($provider === 'gemini' && !empty($aiConfig['gemini_key'])) {
-        $res = callGeminiVisionAPI($filePath, $aiConfig['gemini_key'], $aiConfig['model'] ?: 'gemini-1.5-flash');
+        $res = callGeminiVisionAPI($filePath, $aiConfig['gemini_key'], $aiConfig['model'] ?: 'gemini');
         if ($res !== null) {
             $res['engine'] = 'Google Gemini Vision AI';
             return $res;
@@ -325,7 +325,7 @@ function analyzeSkyWithAI($filePath, $aiConfig = []) {
 
     // 2. OpenAI Vision API
     if ($provider === 'openai' && !empty($aiConfig['openai_key'])) {
-        $res = callOpenAIVisionAPI($filePath, $aiConfig['openai_key'], $aiConfig['model'] ?: 'gpt-4o-mini');
+        $res = callOpenAIVisionAPI($filePath, $aiConfig['openai_key'], $aiConfig['model'] ?: 'gpt');
         if ($res !== null) {
             $res['engine'] = 'OpenAI Vision API';
             return $res;
@@ -386,7 +386,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
 /**
  * Google Gemini Vision API Caller
  */
-function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini-1.5-flash') {
+function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini') {
     if (!file_exists($filePath)) return null;
 
     $imageData = file_get_contents($filePath);
@@ -464,7 +464,7 @@ function callGeminiVisionAPI($filePath, $apiKey, $model = 'gemini-1.5-flash') {
 /**
  * OpenAI Vision API Caller (Chat Completions dengan image_url)
  */
-function callOpenAIVisionAPI($filePath, $apiKey, $model = 'gpt-4o-mini') {
+function callOpenAIVisionAPI($filePath, $apiKey, $model = 'gpt') {
     if (!file_exists($filePath)) return null;
 
     $imageData = file_get_contents($filePath);

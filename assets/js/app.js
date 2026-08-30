@@ -19,6 +19,8 @@ const AudioAlerts = {
     },
     playBeep(freq = 880, duration = 0.15, type = 'sine') {
         if (!isAudioEnabled) return;
+        // Suara HANYA dikeluarkan saat ESP32 terhubung
+        if (!appState || appState.esp32_online !== true) return;
         try {
             this.init();
             if (!this.audioCtx) return;
@@ -37,11 +39,13 @@ const AudioAlerts = {
         }
     },
     playEmergencyRain() {
+        if (!appState || appState.esp32_online !== true) return;
         this.playBeep(950, 0.2, 'sawtooth');
         setTimeout(() => this.playBeep(750, 0.2, 'sawtooth'), 220);
         setTimeout(() => this.playBeep(950, 0.3, 'sawtooth'), 450);
     },
     playSuccessTone() {
+        if (!appState || appState.esp32_online !== true) return;
         this.playBeep(523.25, 0.1, 'sine'); // C5
         setTimeout(() => this.playBeep(659.25, 0.1, 'sine'), 120); // E5
         setTimeout(() => this.playBeep(783.99, 0.2, 'sine'), 240); // G5
@@ -53,6 +57,8 @@ const App = {
         console.log('Initializing SkyGuard AI Dashboard...');
         this._connecting = false;
         this._connectStart = 0;
+        this._initialAlertsLoaded = false;
+        this._lastAlertIds = new Set();
         initTelemetryChart();
         this.fetchStatus();
         this.loadSettings();
@@ -97,6 +103,9 @@ const App = {
                 console.error('Fetch status error:', err);
                 this._connecting = false;
                 this.updateHardwareStatus(false);
+                this._updateMendungLock(false);
+                this._updateControlConnectionLock(false);
+                this._updateAiActionLock(false);
                 this.updateConnectButton();
             });
     },
@@ -212,6 +221,7 @@ const App = {
         // 7b. Kunci fitur yang butuh ESP32 saat terputus (seperti Stopwatch)
         this._updateAiActionLock(s.esp32_online === true);
         this._updateControlConnectionLock(s.esp32_online === true);
+        this._updateMendungLock(s.esp32_online === true);
 
         // 8. Latest Camera Photo
         if (data.latest_photo && data.latest_photo.image_path) {
@@ -373,6 +383,27 @@ const App = {
         if (hint) hint.style.display = locked ? 'block' : 'none';
     },
 
+    _updateMendungLock(online) {
+        const locked = !online;
+        const chk = document.getElementById('chkMendungAutoClose');
+        const label = document.getElementById('labelMendungAutoClose') || chk?.closest('label');
+        const container = document.getElementById('containerMendungAutoClose');
+        if (chk) {
+            chk.disabled = locked;
+        }
+        if (label) {
+            label.classList.toggle('opacity-50', locked);
+            label.classList.toggle('pointer-events-none', locked);
+            label.classList.toggle('cursor-not-allowed', locked);
+            label.classList.toggle('cursor-pointer', !locked);
+        }
+        if (container) {
+            container.classList.toggle('opacity-60', locked);
+        }
+        const hint = document.getElementById('mendungOfflineHint');
+        if (hint) hint.style.display = locked ? 'block' : 'none';
+    },
+
     _updateControlConnectionLock(online) {
         const locked = !online;
         const ids = ['btnModeAuto', 'btnModeManual', 'btnModeTimer', 'btnOpenRoof', 'btnCloseRoof', 'btnCamSnapshot'];
@@ -423,9 +454,12 @@ const App = {
         const badgeEl = document.getElementById('alertsCountBadge');
         if (!listEl) return;
 
-        badgeEl.innerText = alerts.length;
+        if (badgeEl) badgeEl.innerText = alerts.length;
 
         if (alerts.length === 0) {
+            this._initialAlertsLoaded = true;
+            this._lastAlertIds = new Set();
+            lastAlertCount = 0;
             listEl.innerHTML = `
                 <div class="text-center py-6 text-slate-500 text-sm">
                     <i class="fas fa-check-circle text-emerald-500/50 text-2xl mb-2"></i>
@@ -435,15 +469,25 @@ const App = {
             return;
         }
 
-        // Sound trigger for new alert
-        if (alerts.length > lastAlertCount) {
-            if (alerts[0].alert_type === 'RAIN_DETECTED') {
-                AudioAlerts.playEmergencyRain();
-            } else {
-                AudioAlerts.playBeep(600, 0.15);
+        // Jangan bunyikan audio saat render pertama kali (misal: reload atau kembali dari riwayat)
+        if (!this._initialAlertsLoaded) {
+            this._initialAlertsLoaded = true;
+            this._lastAlertIds = new Set(alerts.map(a => a.id));
+            lastAlertCount = alerts.length;
+        } else {
+            // Cek apakah ada alert baru yang belum pernah muncul
+            const hasNewAlerts = alerts.some(a => !this._lastAlertIds.has(a.id));
+            // Suara HANYA dikeluarkan jika ada alert baru DAN ESP32 sedang terhubung
+            if (hasNewAlerts && appState && appState.esp32_online === true) {
+                if (alerts[0].alert_type === 'RAIN_DETECTED') {
+                    AudioAlerts.playEmergencyRain();
+                } else {
+                    AudioAlerts.playBeep(600, 0.15);
+                }
             }
+            this._lastAlertIds = new Set(alerts.map(a => a.id));
+            lastAlertCount = alerts.length;
         }
-        lastAlertCount = alerts.length;
 
         let html = '';
         alerts.slice(0, 5).forEach(a => {
@@ -595,6 +639,13 @@ const App = {
     },
 
     toggleMendungAutoClose(checked) {
+        const chk = document.getElementById('chkMendungAutoClose');
+        if (!appState || appState.esp32_online !== true) {
+            showToast('Hubungkan ESP32 terlebih dahulu untuk mengubah Auto-Close Saat Mendung.', 'danger');
+            if (chk) chk.checked = !checked;
+            this._updateMendungLock(false);
+            return;
+        }
         fetch('api/control.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -604,9 +655,16 @@ const App = {
         .then(data => {
             if (data.success) {
                 showToast(data.message, 'success');
+            } else {
+                showToast(data.error || 'Gagal mengubah pengaturan', 'danger');
+                if (chk) chk.checked = !checked;
             }
         })
-        .catch(err => console.error('Mendung toggle error:', err));
+        .catch(err => {
+            console.error('Mendung toggle error:', err);
+            showToast('Gagal mengubah pengaturan Auto-Close Saat Mendung', 'danger');
+            if (chk) chk.checked = !checked;
+        });
     },
 
     uploadUserPhoto(fileInput) {

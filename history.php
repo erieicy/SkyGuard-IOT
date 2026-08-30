@@ -90,22 +90,22 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div class="sensor-metric-card">
                 <span class="text-xs font-bold text-slate-400 uppercase">Total Foto Cuaca</span>
-                <div class="text-2xl font-extrabold text-cyan-400 mt-2"><?= $totalPhotos ?> <span class="text-xs font-normal text-slate-400">Gambar</span></div>
-                <p class="text-[11px] text-slate-400 mt-1">Tangkapan ESP32-CAM & Upload Pengguna</p>
+                <div class="text-2xl font-extrabold text-cyan-400 mt-2"><?= $totalPhotos ?> / 10 <span class="text-xs font-normal text-slate-400">Gambar</span></div>
+                <p class="text-[11px] text-slate-400 mt-1">Tangkapan ESP32-CAM</p>
             </div>
             <div class="sensor-metric-card">
                 <span class="text-xs font-bold text-slate-400 uppercase">Deteksi Cuaca Mendung</span>
-                <div class="text-2xl font-extrabold text-amber-400 mt-2"><?= $mendungCount ?> <span class="text-xs font-normal text-slate-400">Insiden</span></div>
+                <div class="text-2xl font-extrabold text-amber-400 mt-2"><?= $mendungCount ?> / 10<span class="text-xs font-normal text-slate-400">Insiden</span></div>
                 <p class="text-[11px] text-slate-400 mt-1">Peringatan otomatis & penutupan jemuran</p>
             </div>
             <div class="sensor-metric-card">
                 <span class="text-xs font-bold text-slate-400 uppercase">Deteksi Air / Hujan</span>
-                <div class="text-2xl font-extrabold text-rose-400 mt-2"><?= $rainEventsCount ?> <span class="text-xs font-normal text-slate-400">Kejadian</span></div>
+                <div class="text-2xl font-extrabold text-rose-400 mt-2"><?= $rainEventsCount ?> / 10<span class="text-xs font-normal text-slate-400">Kejadian</span></div>
                 <p class="text-[11px] text-slate-400 mt-1">Proteksi sensor tetesan air instan</p>
             </div>
             <div class="sensor-metric-card">
                 <span class="text-xs font-bold text-slate-400 uppercase">Status Sistem AI</span>
-                <div class="text-2xl font-extrabold text-emerald-400 mt-2">AKTIF <span class="text-xs font-normal text-slate-400">(96.5% Akurat)</span></div>
+                <div class="text-2xl font-extrabold text-emerald-400 mt-2">AKTIF</div>
                 <p class="text-[11px] text-slate-400 mt-1">Klasifikasi spektrum matahari vs lampu</p>
             </div>
         </div>
@@ -224,7 +224,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
                         <tr>
                             <th class="py-3 px-4">Waktu</th>
                             <th class="py-3 px-4">Sensor Air</th>
-                            <th class="py-3 px-4">Cahaya (LDR)</th>
+                            <th class="py-3 px-4">Cahaya</th>
                             <th class="py-3 px-4">Klasifikasi Cahaya</th>
                             <th class="py-3 px-4">Cuaca AI</th>
                             <th class="py-3 px-4">Status Atap</th>
@@ -351,105 +351,7 @@ $mendungCount = $pdo->query("SELECT COUNT(*) FROM camera_history WHERE ai_classi
     </div>
 
     <!-- Skrip penghapusan riwayat foto -->
-    <script>
-        function skyguardOpenPhotoDetail(btn) {
-            var d;
-            try { d = JSON.parse(btn.getAttribute('data-photo')); }
-            catch (e) { console.error('Invalid photo data', e); return; }
-
-            document.getElementById('pdImage').src = d.image || '';
-            document.getElementById('pdImage').style.display = d.image ? 'block' : 'none';
-
-            var cls = document.getElementById('pdClass');
-            cls.textContent = d.classification || '-';
-            var badge = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
-            var c = (d.classification || '').toUpperCase();
-            if (c.indexOf('MENDUNG') !== -1) badge = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-            else if (c.indexOf('LAMP') !== -1) badge = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
-            else if (c.indexOf('HUJAN') !== -1) badge = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
-            cls.className = 'px-2.5 py-1 rounded-md text-[11px] font-bold border ' + badge;
-
-            document.getElementById('pdConf').textContent = 'Akurasi: ' + (d.confidence != null ? d.confidence + '%' : '-');
-            document.getElementById('pdTs').textContent = d.ts || '-';
-            document.getElementById('pdSrc').textContent = d.source || '-';
-            document.getElementById('pdLight').textContent = d.light || '-';
-
-            var roof = document.getElementById('pdRoof');
-            if (d.roof === 'OPENED') { roof.textContent = 'DIBUKA'; roof.className = 'font-bold text-emerald-400'; }
-            else if (d.roof === 'CLOSED') { roof.textContent = 'DITUTUP'; roof.className = 'font-bold text-rose-400'; }
-            else { roof.textContent = 'TETAP'; roof.className = 'font-semibold text-slate-400'; }
-
-            document.getElementById('pdNotes').textContent = d.notes || 'Tidak ada catatan analisis khusus.';
-
-            var m = document.getElementById('photoDetailModal');
-            m.classList.remove('hidden');
-            m.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function skyguardClosePhotoDetail() {
-            var m = document.getElementById('photoDetailModal');
-            m.classList.add('hidden');
-            m.classList.remove('flex');
-            document.body.style.overflow = '';
-        }
-
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') skyguardClosePhotoDetail();
-        });
-
-        function skyguardDeletePhoto(id) {
-            if (!confirm('Hapus foto riwayat ini beserta file gambarnya?')) return;
-            fetch('api/history.php?action=delete_photo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { location.reload(); }
-                else { alert(d.error || 'Gagal menghapus foto.'); }
-            })
-            .catch(e => alert('Gagal berkomunikasi dengan server.'));
-        }
-
-        function skyguardDeleteAllPhotos() {
-            if (!confirm('Hapus SELURUH riwayat foto? Tindakan ini tidak dapat dibatalkan.')) return;
-            fetch('api/history.php?action=delete_all_photos', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { location.reload(); }
-                else { alert(d.error || 'Gagal menghapus foto.'); }
-            })
-            .catch(e => alert('Gagal berkomunikasi dengan server.'));
-        }
-
-        function skyguardDeleteSensorLog(id) {
-            if (!confirm('Hapus log sensor ini?')) return;
-            fetch('api/history.php?action=delete_sensor_log', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { location.reload(); }
-                else { alert(d.error || 'Gagal menghapus log.'); }
-            })
-            .catch(e => alert('Gagal berkomunikasi dengan server.'));
-        }
-
-        function skyguardDeleteAllSensorLogs() {
-            if (!confirm('Hapus SELURUH riwayat log sensor? Tindakan ini tidak dapat dibatalkan.')) return;
-            fetch('api/history.php?action=delete_all_sensor_logs', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) { location.reload(); }
-                else { alert(d.error || 'Gagal menghapus log.'); }
-            })
-            .catch(e => alert('Gagal berkomunikasi dengan server.'));
-        }
-    </script>
+    <script src="assets/js/delete.js"></script>
 
 </body>
 </html>
