@@ -119,13 +119,13 @@ void loop() {
   // 1. Baca Sensor Lokal
   int rainDigital = digitalRead(PIN_RAIN_DIGITAL); // 0 = Air terdeteksi (Active LOW pada modul umum)
   int rainAnalog  = analogRead(PIN_RAIN_ANALOG);   // Nilai 0 (basah) - 4095 (kering)
-  int ldrAnalog   = analogRead(PIN_LDR_ANALOG);    // Nilai 0 (gelap) - 4095 (terang)
+  int ldrAnalog   = analogRead(PIN_LDR_ANALOG);    // Nilai 0 (terang) - 4095 (gelap) — modul LDR terbalik!
 
   // Normalisasi: 1 = Hujan/Basah, 0 = Kering
   int isRainDetected = (rainDigital == LOW || rainAnalog < 2000) ? 1 : 0;
   
-  // Konversi LDR ke persentase (0 - 100%)
-  int lightPercent = map(ldrAnalog, 0, 4095, 0, 100);
+  // Konversi LDR ke persentase (0 - 100%) — INVERTED karena modul LDR terbalik
+  int lightPercent = map(ldrAnalog, 0, 4095, 100, 0);
   lightPercent = constrain(lightPercent, 0, 100);
 
   // 2. Proteksi Darurat Lokal (Zero Latency Protection):
