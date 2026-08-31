@@ -53,10 +53,12 @@ c:/xampp/htdocs/SkyGuard-AI/
 │   │   └── style.css              # Custom Glassmorphism IoT styling & animasi atap
 │   └── js/
 │       ├── app.js                 # Frontend app controller, polling, audio alarm & controls
-│       └── charts.js              # Visualisasi grafik telemetri Chart.js
+│       ├── charts.js              # Visualisasi grafik telemetri Chart.js
+|       └── delete.js              # Menghapus riwayat foto dan log 
 ├── firmware/
 │   ├── esp32_firmware.txt         # Source code C++/Arduino ESP32 (Sensor & Motor Servo)
 │   ├── esp32_cam_firmware.txt     # Source code C++/Arduino ESP32-CAM (Snapshot & HTTP POST)
+|   ├── esp32_cam_only.txt         # Source code C++/Arduino ESP32-CAM (Sensor,Motor servo & sebagai Mikrokontroler)
 │   └── WIRING_AND_PINOUT_GUIDE.txt # Skematik sirkuit lengkap, tabel pinout, & BOM
 ├── uploads/                       # Direktori penyimpanan foto cuaca langit
 ├── data/                          # Database SQLite lokal (skyguard.db)
