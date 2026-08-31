@@ -264,7 +264,7 @@
                 </div>
                 <div class="my-2">
                     <div class="flex items-baseline justify-between mb-1">
-                        <span id="lightPercentVal" class="text-2xl font-extrabold text-amber-400">85%</span>
+                        <span id="lightPercentVal" class="text-2xl font-extrabold text-amber-400">100%</span>
                         <span id="lightVerdictBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                             <i class="fas fa-sun"></i> SINAR MATAHARI
                         </span>
@@ -296,7 +296,7 @@
                 <div class="flex items-center justify-between text-[11px] text-cyan-400 font-semibold border-t border-slate-800/80 pt-1.5">
                     <span>Target Jemur:</span>
                     <span><span id="aiRecommendedMinutes">45</span> Menit</span>
-                </div>
+                </div> 
                 <button onclick="App.applyAiRecommendation()" id="btnApplyAiRoof" title="Terapkan saran AI untuk membuka/menutup atap" class="mt-2 w-full px-2.5 py-1.5 rounded-lg bg-cyan-600/90 hover:bg-cyan-500 text-white text-[11px] font-semibold shadow transition-all flex items-center justify-center gap-1.5">
                     <i class="fas fa-robot"></i> Terapkan Saran AI (Buka/Tutup Atap)
                 </button>
@@ -566,6 +566,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js?v=20260831t2"></script>
+    <script src="assets/js/app.js?v=20260831t3"></script>
 </body>
 </html>

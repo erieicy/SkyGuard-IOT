@@ -191,10 +191,10 @@ const App = {
         const lightVerdictBadge = document.getElementById('lightVerdictBadge');
         if (s.ai_light_verdict === 'SUNLIGHT') {
             lightVerdictBadge.className = 'px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
-            lightVerdictBadge.innerHTML = '<i class="fas fa-sun text-amber-400"></i> SINAR MATAHARI ALAMI';
+            lightVerdictBadge.innerHTML = '<i class="fas fa-sun text-amber-400"></i> SINAR MATAHARI';
         } else if (s.ai_light_verdict === 'ARTIFICIAL_LAMP') {
             lightVerdictBadge.className = 'px-2.5 py-0.5 rounded text-xs font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30';
-            lightVerdictBadge.innerHTML = '<i class="fas fa-lightbulb text-yellow-400"></i> LAMPU RUANGAN (BUATAN)';
+            lightVerdictBadge.innerHTML = '<i class="fas fa-lightbulb text-yellow-400"></i> LAMPU RUANGAN';
         } else {
             lightVerdictBadge.className = 'px-2.5 py-0.5 rounded text-xs font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30';
             lightVerdictBadge.innerHTML = '<i class="fas fa-moon text-slate-400"></i> GELAP / REDUP';
@@ -938,8 +938,10 @@ const LiveCamera = {
             setTimeout(() => flashOverlay.style.opacity = '0', 150);
         }
 
-        // Play shutter sound
-        AudioAlerts.playBeep(1200, 0.08, 'square');
+        // Play shutter sound (HANYA saat ESP32 terhubung)
+        if (appState && appState.esp32_online === true) {
+            AudioAlerts.playBeep(1200, 0.08, 'square');
+        }
 
         // Draw frame to canvas
         canvas.width = video.videoWidth || 640;

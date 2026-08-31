@@ -24,14 +24,15 @@
 // ==========================================
 // 1. PENGATURAN WI-FI & SERVER
 // ==========================================
-const char* WIFI_SSID     = "NAMA_WIFI_ANDA";        // Ganti dengan SSID Wi-Fi Anda
-const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";    // Ganti dengan Password Wi-Fi Anda
+// GANTI dengan SSID dan Password Wi-Fi Anda yang nyala
+const char* WIFI_SSID     = "GANTI_SSID_ANDA";
+const char* WIFI_PASSWORD = "GANTI_PASSWORD_ANDA";
 
-// Masukkan URL Server SkyGuard AI (Ganti IP Laptop/Server XAMPP Anda)
+// URL Server SkyGuard AI — GANTI dengan IP laptop/XAMPP Anda
+// Cek IP laptop: buka cmd, ketik "ipconfig", cari IPv4 Address
 // Contoh: "http://192.168.1.100/SkyGuard-AI/api/esp32.php"
-// URL ini BISA diubah secara dinamis dari Dashboard melalui tombol "Hubungkan"
-// (Dashboard akan mengirim perintah ke http://<IP_ESP32>/connect?server=URL_DASHBOARD)
-String serverUrl = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
+// Server ini: http://10.27.249.159/SkyGuard-AI/api/esp32.php
+String serverUrl = "http://10.27.249.159/SkyGuard-AI/api/esp32.php";
 
 // ==========================================
 // 2. PINOUT HARDWARE ESP32

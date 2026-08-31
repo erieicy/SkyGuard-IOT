@@ -22,12 +22,12 @@
 // ==========================================
 // 1. PENGATURAN WI-FI & SERVER
 // ==========================================
-const char* WIFI_SSID     = "NAMA_WIFI_ANDA";
-const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";
+const char* WIFI_SSID     = "GANTI_SSID_ANDA";
+const char* WIFI_PASSWORD = "GANTI_PASSWORD_ANDA";
 
-// URL Dasar Server SkyGuard AI (bisa diubah via Dashboard "Hubungkan")
-// Contoh: "http://192.168.1.100/SkyGuard-AI/api/esp32.php"
-String baseServerUrl = "http://192.168.1.100/SkyGuard-AI/api/esp32.php";
+// URL Dasar Server SkyGuard AI — GANTI dengan IP laptop/XAMPP Anda
+// Server ini: http://10.27.249.159/SkyGuard-AI/api/esp32.php
+String baseServerUrl = "http://10.27.249.159/SkyGuard-AI/api/esp32.php";
 
 // URL Endpoint dibentuk dari baseServerUrl
 String SERVER_UPLOAD_URL   = baseServerUrl + "?action=upload_cam";
