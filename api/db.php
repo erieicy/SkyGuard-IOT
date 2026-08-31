@@ -80,6 +80,60 @@ function getDbConnection() {
 }
 
 /**
+ * Dapatkan URL endpoint server yang tepat dan dapat diakses oleh ESP32 pada jaringan Wi-Fi LAN.
+ * Mengembalikan format lengkap: http://<LAN_IP>/SkyGuard-AI/api/esp32.php
+ */
+function getEsp32ServerEndpointUrl($pdo = null) {
+    // 1. Cek apakah ada override server_host di database yang valid (bukan dummy/lama)
+    if ($pdo !== null) {
+        try {
+            $customHost = $pdo->query("SELECT value FROM settings WHERE key = 'server_host'")->fetchColumn();
+            if (!empty($customHost) && !in_array($customHost, ['http://192.168.1.50/SkyGuard-AI', '192.168.1.50', 'http://192.168.1.100/SkyGuard-AI'])) {
+                if (stripos($customHost, 'esp32.php') !== false) {
+                    return $customHost;
+                }
+                return rtrim($customHost, '/') . '/api/esp32.php';
+            }
+        } catch (Exception $e) {}
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+
+    $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+    $port = $_SERVER['SERVER_PORT'] ?? '80';
+
+    // Jika diakses dari localhost / 127.0.0.1, gunakan IP LAN komputer agar bisa diakses ESP32
+    if (empty($host) || in_array(strtolower($host), ['localhost', '127.0.0.1', '::1']) || strpos($host, 'localhost:') === 0 || strpos($host, '127.0.0.1:') === 0) {
+        $lanIp = gethostbyname(gethostname());
+        if (!empty($lanIp) && $lanIp !== '127.0.0.1') {
+            $host = $lanIp;
+            if ($port !== '80' && $port !== '443' && strpos($host, ':') === false && !empty($_SERVER['SERVER_PORT'])) {
+                $host .= ':' . $port;
+            }
+        } else {
+            $host = 'localhost';
+        }
+    }
+
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    if (!empty($script) && stripos($script, 'SkyGuard-AI') !== false) {
+        $base = preg_replace('#/api/[^/]*$#i', '', $script);
+        $base = rtrim($base, '/');
+        // Ambil hanya bagian web path mulai dari /SkyGuard-AI
+        $pos = stripos($base, '/SkyGuard-AI');
+        if ($pos !== false) {
+            $base = substr($base, $pos);
+        } else {
+            $base = '/SkyGuard-AI';
+        }
+    } else {
+        $base = '/SkyGuard-AI';
+    }
+
+    return $scheme . '://' . $host . $base . '/api/esp32.php';
+}
+
+/**
  * Terapkan perintah perubahan status atap (OPEN/CLOSED) secara terpusat.
  * Digunakan baik oleh kontrol manual (control.php) maupun oleh AI Vision
  * (ai_analyze.php) agar setiap "input" atap tercatat sebagai log sensor
@@ -285,6 +339,11 @@ function initializeDatabase($pdo) {
             $ins->execute([$key, $val]);
         }
     }
+
+    // Pastikan server_host dummy lama dibersihkan agar selalu mendeteksi IP jaringan yang aktif
+    try {
+        $pdo->exec("UPDATE settings SET value = '' WHERE key = 'server_host' AND (value LIKE '%192.168.1.50%' OR value LIKE '%192.168.1.100%')");
+    } catch (Exception $e) {}
 
     // Pastikan kolom esp32_ip ada (untuk menampilkan IP ESP32 yang terhubung)
     try {

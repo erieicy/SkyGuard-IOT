@@ -90,8 +90,8 @@ const App = {
                             showToast('ESP32 berhasil terhubung ke dashboard!', 'success');
                         } else if (Date.now() - (this._connectStart || 0) > 30000) {
                             this._connecting = false;
-                            showToast('ESP32 tidak membalas koneksi dalam 30 detik. Koneksi dibatalkan.', 'danger');
-                            fetch('api/esp32.php?action=disconnect', { method: 'POST' }).catch(() => {});
+                            showToast('Belum ada respons dari ESP32 (' + (appState.esp32_ip || '') + '). Pastikan ESP32 menyala & satu Wi-Fi.', 'warning');
+                            this.updateConnectButton();
                         }
                     }
 

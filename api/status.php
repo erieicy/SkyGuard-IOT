@@ -85,11 +85,9 @@ if ($state['timer_active'] == 1 && !empty($state['timer_end_time'])) {
 $alertsStmt = $pdo->query("SELECT * FROM alerts ORDER BY id DESC LIMIT 10");
 $alerts = $alertsStmt->fetchAll();
 
-// Check ESP online status (active if seen in last 45 seconds)
-// esp32_last_seen disimpan dalam waktu lokal (datetime('now','localtime'));
-// bandingkan dengan waktu lokal sekarang (zona waktu Asia/Jakarta via db.php).
+// Check ESP online status (active if seen in last 45 seconds and not disconnected)
 $espOnline = false;
-if (!empty($state['esp32_last_seen'])) {
+if (!empty($state['esp32_last_seen']) && empty($state['esp32_disconnected'])) {
     $lastSeen = new DateTime($state['esp32_last_seen']);
     $now = new DateTime('now');
     $diffSec = $now->getTimestamp() - $lastSeen->getTimestamp();
@@ -107,6 +105,7 @@ $latestPhoto = $latestPhotoStmt->fetch();
 echo json_encode([
     'success' => true,
     'server_time' => date('Y-m-d H:i:s'),
+    'server_endpoint' => getEsp32ServerEndpointUrl($pdo),
     'state' => [
         'roof_status' => $state['roof_status'],
         'control_mode' => $state['control_mode'],

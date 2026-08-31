@@ -280,12 +280,17 @@ void handleEsp32Server() {
     if (q >= 0) {
       String newUrl = path.substring(q + 7);
 
-      // URL-decode sederhana untuk karakter umum
+      // URL-decode untuk karakter URL umum
       newUrl.replace("%2F", "/");
+      newUrl.replace("%2f", "/");
       newUrl.replace("%3A", ":");
+      newUrl.replace("%3a", ":");
       newUrl.replace("%3D", "=");
+      newUrl.replace("%3d", "=");
       newUrl.replace("%26", "&");
-      newUrl.replace("+", "");
+      newUrl.replace("%3F", "?");
+      newUrl.replace("%3f", "?");
+      newUrl.replace("+", " ");
 
       serverUrl = newUrl;
       preferences.putString("server_url", serverUrl);

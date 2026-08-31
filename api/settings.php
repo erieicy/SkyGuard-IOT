@@ -50,10 +50,7 @@ if ($action === 'get_settings') {
         $activeProvider = strtolower($settingsList['ai_provider']);
     }
 
-    $serverHost = $settingsList['server_host'] ?? '';
-    if (empty($serverHost)) {
-        $serverHost = detectServerHost();
-    }
+    $serverHost = getEsp32ServerEndpointUrl($pdo);
 
     echo json_encode([
         'success' => true,
@@ -63,7 +60,7 @@ if ($action === 'get_settings') {
             'light_threshold' => (int)($settingsList['light_threshold'] ?? 40),
             'rain_threshold' => (int)($settingsList['rain_threshold'] ?? 30),
             'server_host' => $serverHost,
-            'detected_host' => detectServerHost()
+            'detected_host' => $serverHost
         ]
     ]);
     exit;

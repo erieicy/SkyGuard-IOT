@@ -61,10 +61,13 @@
                 <button id="btnConnectEsp32" onclick="App.toggleEsp32Connection()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-500/40 shadow flex items-center gap-1.5 transition-all">
                     <i class="fas fa-link"></i> <span class="hidden sm:inline">Hubungkan</span>
                 </button>
-                <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all" onclick="App.fetchStatus()">
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/60 transition-all" onclick="App.fetchStatus()" title="Status Koneksi ESP32">
                     <span id="espStatusDot" class="pulse-dot offline"></span>
                     <span id="espStatusText" class="text-xs font-semibold text-rose-400">TERPUTUS</span>
                 </div>
+                <button onclick="document.getElementById('settingsModal').classList.remove('hidden'); App.loadSettings();" title="Pengaturan & Alamat Server ESP32" class="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-cyan-300 flex items-center justify-center transition-all">
+                    <i class="fas fa-gear text-xs"></i>
+                </button>
             </div>
         </div>
     </nav>
@@ -563,6 +566,6 @@
 
     <!-- Scripts -->
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/app.js?v=20260831t2"></script>
 </body>
 </html>

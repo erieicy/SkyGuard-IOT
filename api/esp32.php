@@ -21,17 +21,16 @@ $action = $_GET['action'] ?? $_POST['action'] ?? 'get_command';
 
 // 1. ESP32 Polling & Command Retrieval
 if ($action === 'get_command' || ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
-    // Update heartbeat HANYA jika tidak dalam mode disconnect paksa.
-    // Jika ESP32 mem-poll, berarti ia merespons perintah koneksi -> koneksi resmi TERHUBUNG.
     $espIp = $_SERVER['REMOTE_ADDR'] ?? null;
-    $disc = (int)$pdo->query("SELECT esp32_disconnected FROM device_state WHERE id = 1")->fetchColumn();
-    if (!$disc) {
-        $pdo->prepare("
-            UPDATE device_state
-            SET esp32_last_seen = datetime('now', 'localtime'), esp32_ip = ?, pending_esp32_ip = NULL, pending_since = NULL
-            WHERE id = 1
-        ")->execute([$espIp]);
-    }
+    $pdo->prepare("
+        UPDATE device_state
+        SET esp32_last_seen = datetime('now', 'localtime'),
+            esp32_ip = COALESCE(?, esp32_ip),
+            pending_esp32_ip = NULL,
+            pending_since = NULL,
+            esp32_disconnected = 0
+        WHERE id = 1
+    ")->execute([$espIp]);
 
     $stmt = $pdo->query("SELECT * FROM device_state WHERE id = 1");
     $state = $stmt->fetch();
@@ -69,8 +68,7 @@ if ($action === 'request_snapshot') {
     exit;
 }
 
-// Manual connection from Dashboard: verifikasi identitas ESP32, lalu TUNGGU
-// ESP32 mem-poll balik sebelum status dianggap "terhubung".
+// Manual connection from Dashboard: kirim URL server ke ESP32 dan verifikasi koneksi
 if ($action === 'connect') {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true) ?? $_POST;
@@ -87,49 +85,64 @@ if ($action === 'connect') {
 
     // Validasi format IP (IPv4)
     if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-        echo json_encode(['success' => false, 'error' => 'Format alamat IP tidak valid']);
+        echo json_encode(['success' => false, 'error' => 'Format alamat IP tidak valid (contoh: 192.168.1.50)']);
         exit;
     }
 
-    // Tentukan URL server yang akan diberitahukan ke ESP32 (agar ia mulai mem-poll).
-    $serverHost = $pdo->query("SELECT value FROM settings WHERE key = 'server_host'")->fetchColumn();
-    if (empty($serverHost)) {
-        $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $serverHost = $proto . '://' . $host . '/SkyGuard-AI/api/esp32.php';
-    }
+    // Dapatkan URL endpoint server yang otomatis mengarahkan ke IP LAN yang benar
+    $serverHost = getEsp32ServerEndpointUrl($pdo);
+    $connectUrl = 'http://' . $ip . '/connect?server=' . urlencode($serverHost);
     $pingUrl = 'http://' . $ip . '/';
-    $connectUrl = $pingUrl . 'connect?server=' . urlencode($serverHost);
 
-    // 1. Kirim perintah koneksi ke ESP32 dan baca respons untuk VERIFIKASI IDENTITAS.
-    //    Kita hanya lanjut jika perangkat benar-benar mengonfirmasi sebagai SkyGuard ESP32
-    //    (bukan sekadar IP random yang kebetulan merespons HTTP).
-    $ctx = @stream_context_create(['http' => ['timeout' => 4, 'ignore_errors' => true, 'method' => 'GET']]);
-    $resp = @file_get_contents($connectUrl, false, $ctx, 0, 256);
-    $headerOk = isset($http_response_header) && count($http_response_header) > 0;
+    $isSkyGuard = false;
 
-    $isSkyGuard = ($resp !== false) && (
-        stripos($resp, 'SKYGUARD') !== false ||
-        stripos($resp, 'ESP32') !== false
-    );
-    // Fallback: coba root "/" yang mengembalikan "SkyGuard ESP32-CAM Ready"
-    if (!$isSkyGuard && !$headerOk) {
-        $r2 = @file_get_contents($pingUrl, false, $ctx, 0, 256);
-        if ($r2 !== false && (stripos($r2, 'SKYGUARD') !== false || stripos($r2, 'ESP32') !== false)) {
+    // 1. Kirim perintah /connect ke Web Server di ESP32 menggunakan cURL (lebih cepat & reliable dibanding file_get_contents)
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $connectUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        $resp = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($resp !== false && ($httpCode === 200 || stripos($resp, 'SKYGUARD') !== false || stripos($resp, 'ESP32') !== false)) {
+            $isSkyGuard = true;
+        } else {
+            // Fallback ping root "/"
+            $ch2 = curl_init();
+            curl_setopt($ch2, CURLOPT_URL, $pingUrl);
+            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($ch2, CURLOPT_TIMEOUT, 3);
+            $r2 = curl_exec($ch2);
+            $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+            curl_close($ch2);
+            if ($r2 !== false && ($httpCode2 === 200 || stripos($r2, 'SKYGUARD') !== false || stripos($r2, 'ESP32') !== false)) {
+                $isSkyGuard = true;
+            }
+        }
+    } else {
+        $ctx = @stream_context_create(['http' => ['timeout' => 3, 'ignore_errors' => true, 'method' => 'GET']]);
+        $resp = @file_get_contents($connectUrl, false, $ctx, 0, 256);
+        if ($resp !== false && (stripos($resp, 'SKYGUARD') !== false || stripos($resp, 'ESP32') !== false)) {
             $isSkyGuard = true;
         }
     }
 
-    if (!$isSkyGuard) {
-        echo json_encode([
-            'success' => false,
-            'error' => 'Perangkat di ' . $ip . ' bukan SkyGuard ESP32 (tidak mengonfirmasi identitas). Pastikan IP benar & perangkat menyala.'
-        ]);
-        exit;
+    // Cek juga apakah ESP32 dari IP ini baru saja aktif
+    $st = $pdo->query("SELECT esp32_last_seen, esp32_ip FROM device_state WHERE id = 1")->fetch();
+    if (!empty($st['esp32_last_seen'])) {
+        $lastSeen = new DateTime($st['esp32_last_seen']);
+        $now = new DateTime('now');
+        if (($now->getTimestamp() - $lastSeen->getTimestamp()) <= 45 && ($st['esp32_ip'] === $ip || empty($st['esp32_ip']))) {
+            $isSkyGuard = true;
+        }
     }
 
-    // 2. Perangkat terverifikasi -> tandai MENUNGGU (pending). JANGAN langsung "terhubung".
-    //    Status baru menjadi TERHUBUNG setelah ESP32 benar-benar mem-poll server kita.
+    // Daftarkan IP dan buka blokir disconnect agar request dari ESP32 langsung diterima
     $pdo->prepare("
         UPDATE device_state
         SET pending_esp32_ip = ?, pending_since = datetime('now','localtime'), esp32_ip = ?, esp32_disconnected = 0
@@ -139,8 +152,11 @@ if ($action === 'connect') {
     echo json_encode([
         'success' => true,
         'status' => 'pending',
-        'message' => 'Perintah dikirim ke ESP32. Menunggu ESP32 membalas koneksi...',
-        'esp32_ip' => $ip
+        'message' => $isSkyGuard 
+            ? 'Perintah koneksi terkirim ke ESP32 (' . $ip . '). Menunggu respons data...'
+            : 'IP ESP32 (' . $ip . ') didaftarkan. Mengirim konfigurasi server: ' . $serverHost,
+        'esp32_ip' => $ip,
+        'server_endpoint' => $serverHost
     ]);
     exit;
 }
@@ -191,22 +207,22 @@ if ($action === 'update_sensors') {
         $reason = 'Hujan telah reda. Sensor mendeteksi kondisi kering.';
     }
 
-    // Update state (jangan perbarui esp32_last_seen bila sedang disconnect paksa)
-    $disc = (int)$pdo->query("SELECT esp32_disconnected FROM device_state WHERE id = 1")->fetchColumn();
-    $lastSeenSql = $disc ? '' : "esp32_last_seen = datetime('now', 'localtime'),";
+    $espIp = $_SERVER['REMOTE_ADDR'] ?? null;
     $update = $pdo->prepare("
         UPDATE device_state 
         SET rain_detected = ?,
             light_level = ?,
             roof_status = ?,
             last_action_reason = ?,
-            $lastSeenSql
+            esp32_last_seen = datetime('now', 'localtime'),
+            esp32_ip = COALESCE(?, esp32_ip),
             pending_esp32_ip = NULL,
             pending_since = NULL,
+            esp32_disconnected = 0,
             updated_at = datetime('now', 'localtime')
         WHERE id = 1
     ");
-    $update->execute([$rain, $light, $newRoofStatus, $reason]);
+    $update->execute([$rain, $light, $newRoofStatus, $reason, $espIp]);
 
     // Catat log SETIAP perubahan sensor (hujan berubah ATAU cahaya berubah sedikit pun).
     // Jika tidak ada perubahan sama sekali, tidak ada log baru.
@@ -236,6 +252,16 @@ if ($action === 'update_sensors') {
 
 // 3. ESP32-CAM Image Upload & Auto Evaluation
 if ($action === 'upload_cam') {
+    $espIp = $_SERVER['REMOTE_ADDR'] ?? null;
+    $pdo->prepare("
+        UPDATE device_state
+        SET esp32_cam_last_seen = datetime('now', 'localtime'),
+            esp32_last_seen = datetime('now', 'localtime'),
+            esp32_ip = COALESCE(?, esp32_ip),
+            esp32_disconnected = 0
+        WHERE id = 1
+    ")->execute([$espIp]);
+
     $uploadDir = __DIR__ . '/../uploads/';
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
