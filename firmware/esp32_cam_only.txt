@@ -1,0 +1,393 @@
+/*
+ ============================================================================
+  SkyGuard AI - ESP32-CAM All-in-One Controller Firmware
+  Project: Smart Automated Clothesline (Jemuran Baju Pintar IoT)
+  Target Board: AI-Thinker ESP32-CAM (OV2640 Sensor)
+ ============================================================================
+*/
+
+#include "esp_camera.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <Preferences.h>
+
+// ==========================================
+// 1. PENGATURAN WI-FI & SERVER
+// ==========================================
+const char* WIFI_SSID     = "GANTI_SSID_ANDA";
+const char* WIFI_PASSWORD = "GANTI_PASSWORD_ANDA";
+
+// URL Server SkyGuard AI (Sesuaikan IP Laptop XAMPP lu)
+String baseServerUrl = "http://10.27.249.159/SkyGuard-AI/api/esp32.php";
+String SERVER_UPLOAD_URL;
+String SERVER_COMMAND_URL;
+String SERVER_SENSOR_URL;
+
+WiFiServer esp32CamServer(80);
+Preferences camPreferences;
+
+// ==========================================
+// 2. PINOUT CAMERA AI-THINKER ESP32-CAM
+// ==========================================
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM      0
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
+
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       21
+#define Y4_GPIO_NUM       19
+#define Y3_GPIO_NUM       18
+#define Y2_GPIO_NUM        5
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
+
+#define FLASH_LED_PIN      4 
+
+// ==========================================
+// 3. PIN SENSOR & AKTUATOR (TUNGGAL ESP32-CAM)
+// ==========================================
+#define PIN_RAIN_DIGITAL    12  // Sensor Hujan Digital (Active LOW)
+#define PIN_LDR_ANALOG      2   // Sensor Cahaya LDR Analog/Digital
+
+#define ACTUATOR_OPEN_PIN   14  // Relay Penggerak Atap BUKA
+#define ACTUATOR_CLOSE_PIN  13  // Relay Penggerak Atap TUTUP
+
+const unsigned long ROOF_MOVE_MS = 3000; // Durasi jalan motor (3 detik)
+String currentRoofStatus = "CLOSED";
+
+// Timer
+const unsigned long SENSOR_INTERVAL = 3000;  // Kirim data sensor tiap 3 dtk
+unsigned long lastSensorTime = 0;
+
+const unsigned long CAPTURE_INTERVAL = 300000; // Foto otomatis tiap 5 menit
+unsigned long lastCaptureTime = 0;
+
+const unsigned long POLL_INTERVAL = 2000;    // Cek perintah server tiap 2 dtk
+unsigned long lastPollTime = 0;
+
+// ==========================================
+// 4. SETUP SISTEM
+// ==========================================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n===========================================");
+  Serial.println("  SKYGUARD AI - ESP32-CAM ALL-IN-ONE SYSTEM ");
+  Serial.println("===========================================");
+
+  // Setup Hardware Pin
+  pinMode(FLASH_LED_PIN, OUTPUT);
+  digitalWrite(FLASH_LED_PIN, LOW);
+
+  pinMode(PIN_RAIN_DIGITAL, INPUT);
+  pinMode(PIN_LDR_ANALOG, INPUT);
+
+  pinMode(ACTUATOR_OPEN_PIN, OUTPUT);
+  pinMode(ACTUATOR_CLOSE_PIN, OUTPUT);
+  digitalWrite(ACTUATOR_OPEN_PIN, LOW);
+  digitalWrite(ACTUATOR_CLOSE_PIN, LOW);
+
+  // Inisialisasi Kamera
+  if (!initCamera()) {
+    Serial.println("[ERROR] Inisialisasi Kamera GAGAL!");
+    while (true) { delay(1000); }
+  }
+  Serial.println("[KAMERA] OV2640 Berhasil Diinisialisasi!");
+
+  // Koneksi Wi-Fi
+  connectWiFi();
+
+  // Load URL Server
+  camPreferences.begin("skyguard_cam", false);
+  String savedUrl = camPreferences.getString("server_url", "");
+  if (savedUrl.length() > 0) baseServerUrl = savedUrl;
+  
+  updateEndpoints();
+
+  esp32CamServer.begin();
+  
+  // Set atap awal tertutup demi keamanan
+  moveRoof("CLOSED");
+  delay(1000);
+  captureAndUploadSkyImage();
+}
+
+// ==========================================
+// 5. LOOP UTAMA
+// ==========================================
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) connectWiFi();
+
+  handleCamEsp32Server();
+
+  // --- A. BACA SENSOR LOKAL ---
+  int rainDigital = digitalRead(PIN_RAIN_DIGITAL); // 0 = Hujan (Active LOW)
+  int ldrValue    = analogRead(PIN_LDR_ANALOG);
+  int isRainDetected = (rainDigital == LOW) ? 1 : 0;
+  int lightPercent   = map(ldrValue, 0, 4095, 100, 0);
+  lightPercent       = constrain(lightPercent, 0, 100);
+
+  // --- B. ZERO-LATENCY PROTECTION (DARURAT) ---
+  // Kalau kehujanan, LANGSUNG TUTUP tanpa nunggu respon server!
+  if (isRainDetected == 1 && currentRoofStatus != "CLOSED") {
+    Serial.println("\n[DARURAT] Air hujan terdeteksi instan! Menutup atap...");
+    moveRoof("CLOSED");
+  }
+
+  // --- C. KIRIM DATA SENSOR KE SERVER ---
+  if (millis() - lastSensorTime >= SENSOR_INTERVAL) {
+    lastSensorTime = millis();
+    sendSensorData(isRainDetected, lightPercent);
+  }
+
+  // --- D. CEK PERINTAH DASHBOARD ---
+  if (millis() - lastPollTime >= POLL_INTERVAL) {
+    lastPollTime = millis();
+    checkRemoteCommands();
+  }
+
+  // --- E. FOTO LANGIT OTOMATIS BERKALA ---
+  if (millis() - lastCaptureTime >= CAPTURE_INTERVAL) {
+    captureAndUploadSkyImage();
+  }
+
+  delay(50);
+}
+
+// ==========================================
+// 6. FUNGSI KONTROL AKTUATOR ATAP
+// ==========================================
+void moveRoof(const String& dir) {
+  int pin = -1;
+  if (dir == "CLOSED") {
+    pin = ACTUATOR_CLOSE_PIN;
+    Serial.println("[AKTUATOR] Menutup Atap...");
+  } else if (dir == "OPEN" || dir == "OPENED") {
+    pin = ACTUATOR_OPEN_PIN;
+    Serial.println("[AKTUATOR] Membuka Atap...");
+  } else {
+    return;
+  }
+
+  if (pin >= 0) {
+    digitalWrite(pin, HIGH);
+    delay(ROOF_MOVE_MS);
+    digitalWrite(pin, LOW);
+    currentRoofStatus = (dir == "OPENED") ? "OPEN" : dir;
+    Serial.println("[AKTUATOR] Selesai. Status Atap: " + currentRoofStatus);
+  }
+}
+
+// ==========================================
+// 7. FUNGSI KOMUNIKASI HTTP & SENSOR
+// ==========================================
+void sendSensorData(int rain, int light) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  http.begin(SERVER_SENSOR_URL);
+  http.addHeader("Content-Type", "application/json");
+
+  StaticJsonDocument<200> doc;
+  doc["rain"] = rain;
+  doc["light"] = light;
+  doc["device_id"] = "esp32_cam_main";
+
+  String body;
+  serializeJson(doc, body);
+  http.POST(body);
+  http.end();
+}
+
+void checkRemoteCommands() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  http.begin(SERVER_COMMAND_URL);
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    
+    // Trigger snapshot manual dari dashboard
+    if (payload.indexOf("\"trigger_snapshot\":true") >= 0) {
+      Serial.println("\n[TRIGGER] Perintah Ambil Foto dari User!");
+      captureAndUploadSkyImage();
+    }
+
+    // Perintah buka/tutup dari manual/timer dashboard
+    StaticJsonDocument<512> doc;
+    if (!deserializeJson(doc, payload)) {
+      String desiredStatus = doc["roof_status"] | "";
+      int rainDetected = doc["rain_detected"] | 0;
+
+      if (desiredStatus != "" && desiredStatus != currentRoofStatus) {
+        if (desiredStatus == "OPEN" && rainDetected == 0) {
+          moveRoof("OPEN");
+        } else if (desiredStatus == "CLOSED") {
+          moveRoof("CLOSED");
+        }
+      }
+    }
+  }
+  http.end();
+}
+
+void captureAndUploadSkyImage() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  Serial.println("\n[KAMERA] Mengambil foto kondisi langit...");
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("[ERROR] Gagal ambil frame kamera!");
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  if (http.begin(client, SERVER_UPLOAD_URL)) {
+    String boundary = "----WebKitFormBoundarySkyGuardAI" + String(millis());
+    http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+    String head = "--" + boundary + "\r\n" +
+                  "Content-Disposition: form-data; name=\"source\"\r\n\r\n" +
+                  "esp32_cam\r\n" +
+                  "--" + boundary + "\r\n" +
+                  "Content-Disposition: form-data; name=\"image\"; filename=\"esp32_sky.jpg\"\r\n" +
+                  "Content-Type: image/jpeg\r\n\r\n";
+    String tail = "\r\n--" + boundary + "--\r\n";
+
+    size_t totalLen = head.length() + fb->len + tail.length();
+    uint8_t * payload = (uint8_t *)malloc(totalLen);
+
+    if (payload != NULL) {
+      memcpy(payload, head.c_str(), head.length());
+      memcpy(payload + head.length(), fb->buf, fb->len);
+      memcpy(payload + head.length() + fb->len, tail.c_str(), tail.length());
+
+      int httpResponseCode = http.POST(payload, totalLen);
+      if (httpResponseCode > 0) {
+        String response = http.getString();
+        Serial.println("[AI VERDICT] " + response);
+        handleAiVerdict(response);
+      }
+      free(payload);
+    }
+    http.end();
+  }
+  esp_camera_fb_return(fb);
+  lastCaptureTime = millis();
+}
+
+void handleAiVerdict(String response) {
+  int rainDigital = digitalRead(PIN_RAIN_DIGITAL);
+  if (rainDigital == LOW) return; // Kalau lagi hujan lokal, cuekin perintah BUKA dari AI
+
+  String action = extractJsonField(response, "roof_action");
+  if (action == "") action = extractJsonField(response, "new_roof_status");
+  action.toUpperCase();
+
+  if (action == "CLOSED" && currentRoofStatus != "CLOSED") {
+    moveRoof("CLOSED");
+  } else if ((action == "OPENED" || action == "OPEN") && currentRoofStatus != "OPEN") {
+    moveRoof("OPEN");
+  }
+}
+
+// ==========================================
+// 8. HELPER & INITIALIZATION
+// ==========================================
+void updateEndpoints() {
+  SERVER_UPLOAD_URL  = baseServerUrl + "?action=upload_cam";
+  SERVER_COMMAND_URL = baseServerUrl + "?action=get_command";
+  SERVER_SENSOR_URL  = baseServerUrl + "?action=update_sensors";
+}
+
+String extractJsonField(String json, String key) {
+  int idx = json.indexOf("\"" + key + "\"");
+  if (idx < 0) return "";
+  int colon = json.indexOf(':', idx);
+  if (colon < 0) return "";
+  int q1 = json.indexOf('"', colon);
+  if (q1 < 0) return "";
+  int q2 = json.indexOf('"', q1 + 1);
+  if (q2 < 0) return "";
+  return json.substring(q1 + 1, q2);
+}
+
+bool initCamera() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+
+  if (psramFound()) {
+    config.frame_size = FRAMESIZE_VGA;
+    config.jpeg_quality = 12;
+    config.fb_count = 2;
+  } else {
+    config.frame_size = FRAMESIZE_QVGA;
+    config.jpeg_quality = 15;
+    config.fb_count = 1;
+  }
+  return (esp_camera_init(&config) == ESP_OK);
+}
+
+void handleCamEsp32Server() {
+  WiFiClient client = esp32CamServer.available();
+  if (!client) return;
+  String reqLine = client.readStringUntil('\n');
+  reqLine.trim();
+
+  if (reqLine.indexOf("/connect?server=") >= 0) {
+    int q = reqLine.indexOf("server=");
+    int space = reqLine.indexOf(' ', q);
+    String newUrl = reqLine.substring(q + 7, space > 0 ? space : reqLine.length());
+    newUrl.replace("%2F", "/"); newUrl.replace("%3A", ":");
+    baseServerUrl = newUrl;
+    updateEndpoints();
+    camPreferences.putString("server_url", baseServerUrl);
+  }
+
+  String resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nSkyGuard OK";
+  client.print(resp);
+  client.stop();
+}
+
+void connectWiFi() {
+  Serial.printf("[WIFI] Connecting to: %s ", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    Serial.print(".");
+    tries++;
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WIFI] Connected! IP: " + WiFi.localIP().toString());
+  }
+}
