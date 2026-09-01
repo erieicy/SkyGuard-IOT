@@ -692,3 +692,185 @@ body {
   }
 }
 
+/* ============================================================================
+    Mobile Responsiveness (max-width: 640px)
+    ============================================================================ */
+@media (max-width: 640px) {
+  /* Ensure content has proper horizontal padding */
+  main {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* Navbar responsive adjustments */
+  .navbar-custom {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .navbar-custom > div:last-child .flex.items-center.gap-3 {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  #espIpInput {
+    width: 100% !important;
+    max-width: 110px !important;
+    font-size: 0.7rem !important;
+    padding: 6px 8px !important;
+  }
+
+  #btnConnectEsp32 {
+    font-size: 0.7rem !important;
+    padding: 6px 10px !important;
+    flex-shrink: 0;
+  }
+
+  /* Hide status text, keep only dot on mobile */
+  #espStatusText {
+    display: none !important;
+  }
+
+  #espStatusDot {
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+
+  .navbar-custom button[onclick*="settingsModal"] {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .navbar-custom button[onclick*="settingsModal"] i {
+    font-size: 0.75rem !important;
+  }
+
+  /* Main content spacing */
+  main.max-w-7xl {
+    padding-top: 12px !important;
+    padding-bottom: 80px !important;
+    gap: 12px !important;
+  }
+
+  /* Card spacing */
+  .glass-panel {
+    border-radius: 14px !important;
+    padding: 14px !important;
+  }
+
+  /* Typography adjustments */
+  h1, h2, h3 {
+    font-size: 0.9rem !important;
+  }
+
+  /* Roof visualizer */
+  .roof-visualizer-box {
+    height: 220px !important;
+    border-radius: 14px !important;
+  }
+
+  .clothesline-structure {
+    height: 170px !important;
+    max-width: 320px !important;
+  }
+
+  .sun-orb {
+    width: 45px !important;
+    height: 45px !important;
+    top: 15px !important;
+    right: 20px !important;
+  }
+
+  /* Sensor cards */
+  .sensor-metric-card {
+    padding: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Mode pills */
+  .mode-pill-btn {
+    padding: 8px 10px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Control buttons */
+  .btn-action-open, .btn-action-close {
+    padding: 10px 14px !important;
+    font-size: 0.8rem !important;
+    border-radius: 10px !important;
+  }
+
+  /* Status badges */
+  .badge-status {
+    font-size: 0.7rem !important;
+    padding: 4px 10px !important;
+  }
+
+  /* Camera section */
+  .camera-feed-box {
+    height: 180px !important;
+    border-radius: 12px !important;
+  }
+
+  /* AI verdict banner */
+  .ai-verdict-banner {
+    padding: 10px !important;
+  }
+
+  /* Alert items */
+  #alertsListContainer .p-3\.5 {
+    padding: 10px !important;
+  }
+
+  /* Timer digits */
+  .timer-digits {
+    font-size: 1.8rem !important;
+  }
+
+  /* Charts */
+  canvas {
+    max-width: 100% !important;
+  }
+
+  /* Grid spacing on mobile */
+  .grid.gap-8 {
+    gap: 12px !important;
+  }
+
+  /* Reduce space-y on mobile */
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 8px !important;
+  }
+
+  /* Light percentage value */
+  #lightPercentVal {
+    font-size: 1.5rem !important;
+  }
+
+  /* Footer / bottom nav spacing handled by fixed nav */
+}
+
+/* Extra small devices (max-width: 380px) */
+@media (max-width: 380px) {
+  #espIpInput {
+    max-width: 90px !important;
+  }
+
+  .roof-visualizer-box {
+    height: 180px !important;
+  }
+
+  .clothesline-structure {
+    height: 140px !important;
+  }
+}
+
